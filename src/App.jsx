@@ -1,19 +1,21 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login          from "./pages/Login";
-import Dashboard      from "./pages/Dashboard";
-import Departments    from "./pages/Departments";
-import Sidebar        from "./components/Sidebar";
-import Navbar         from "./components/Navbar";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Departments from "./pages/Departments";
+import Sidebar from "./components/Sidebar";
+import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { ROLES }      from "./config/roles.jsx";
+import { ROLES } from "./config/roles.jsx";
+import Designations from "./pages/Designations.jsx";
 
 // ── Layout wrapper ────────────────────────────
 //  "page" prop decides what renders in the content area
 // ─────────────────────────────────────────────
 function DashboardLayout({ page }) {
   const pages = {
-    dashboard:   <Dashboard />,
+    dashboard: <Dashboard />,
     departments: <Departments />,
+    designation: <Designations />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -23,9 +25,7 @@ function DashboardLayout({ page }) {
       <Sidebar />
       <div className="flex-1 ml-64">
         <Navbar />
-        <div className="pt-16">
-          {pages[page] || <Dashboard />}
-        </div>
+        <div className="pt-16">{pages[page] || <Dashboard />}</div>
       </div>
     </div>
   );
@@ -36,7 +36,6 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* Public */}
         <Route path="/" element={<Login />} />
 
@@ -59,10 +58,17 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/designation"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <DashboardLayout page="designation" />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" />} />
-
       </Routes>
     </BrowserRouter>
   );

@@ -209,7 +209,7 @@ export default function XcelTechSplitLogin() {
         </div>
 
         {/* Form */}
-        <div className="w-full flex flex-col justify-center flex-1">
+        <form onSubmit={handleSubmit} className="w-full flex flex-col justify-center flex-1">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h2>
           <p className="text-sm text-gray-400 mb-8">Sign in to your account</p>
 
@@ -271,7 +271,7 @@ export default function XcelTechSplitLogin() {
 
           {/* Sign In button */}
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
             className={`w-full py-3 rounded-lg font-bold text-sm tracking-wider transition-all duration-150 ${
               loading ? "opacity-70 cursor-not-allowed" : "hover:brightness-95 active:scale-[0.98]"
@@ -293,7 +293,7 @@ export default function XcelTechSplitLogin() {
           <p className="text-center text-xs text-gray-400 mt-4">
             Test: <span className="font-medium text-gray-600">emilys</span> / <span className="font-medium text-gray-600">emilyspass</span>
           </p>
-        </div>
+        </form>
 
         <p className="text-gray-400 text-xs text-center mt-4">© 2025 XcelTech. All rights reserved.</p>
       </div>
