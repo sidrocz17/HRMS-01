@@ -1,15 +1,7 @@
-// Login.jsx — relevant changes only
-// ─────────────────────────────────────────────
-//  WHAT CHANGED vs your original:
-//  1. Import ROLE_REDIRECT from roles config
-//  2. After successful login, store role in localStorage
-//  3. Redirect based on role using ROLE_REDIRECT map
-// ─────────────────────────────────────────────
-
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";  // ← NEW IMPORT
+import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
 
 const API_BASE_URL = (
   import.meta.env.DEV
@@ -17,7 +9,6 @@ const API_BASE_URL = (
     : (import.meta.env.VITE_API_BASE_URL || "http://172.16.219.107:8080")
 ).replace(/\/+$/, "");
 
-// ── Icons (unchanged from your original) ───────
 const NetworkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="18" cy="18" r="3.5" fill="white" />
@@ -55,7 +46,6 @@ const EyeIcon = ({ open }) => open ? (
   </svg>
 );
 
-// ── Component ───────────────────────────────────
 export default function XcelTechSplitLogin() {
   const [email, setEmail]                   = useState("");
   const [password, setPassword]             = useState("");
@@ -67,7 +57,6 @@ export default function XcelTechSplitLogin() {
 
   const navigate = useNavigate();
 
-  // ── Already logged in → skip login page ──────
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role  = normalizeRole(localStorage.getItem("role"));
@@ -76,7 +65,6 @@ export default function XcelTechSplitLogin() {
     }
   }, [navigate]);
 
-  // ── Handle login submit ───────────────────────
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
     const username = email.trim();
@@ -101,21 +89,15 @@ export default function XcelTechSplitLogin() {
       const data = response.data;
       console.log("Login response:", data);
 
-      // ── STEP 1: Store token (unchanged) ───────
       const token = data.accessToken || data.token;
       if (!token) {
         throw new Error("Token missing in login response");
       }
       localStorage.setItem("token", token);
 
-      // ── STEP 2: Store role ────────────────────
-      //  dummyjson returns data.role. In your real
-      //  backend, use whatever field your API returns.
-      //  e.g. data.user.role / data.role / data.userRole
       const userRole = normalizeRole(data.role || data.user?.role || "admin");
         localStorage.setItem("role", userRole);
 
-      // ── STEP 3: Store user info (optional) ────
       localStorage.setItem("user", JSON.stringify({
         id:        data.id || data.user?.id,
         firstName: data.firstName || data.user?.firstName,
@@ -125,7 +107,6 @@ export default function XcelTechSplitLogin() {
         role:      userRole,
       }));
 
-      // ── STEP 4: Redirect based on role ────────
       const redirectPath = ROLE_REDIRECT[userRole] || "/dashboard";
       navigate(redirectPath, { replace: true });
 
@@ -154,13 +135,9 @@ export default function XcelTechSplitLogin() {
     }
   };
 
-  // ── JSX (unchanged from your original) ────────
   return (
     <div className="flex h-screen w-full overflow-hidden" style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
-
-      {/* LEFT SIDE — unchanged */}
       <div className="hidden md:flex md:w-3/4 relative flex-col">
-        {/* Background image */}
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
@@ -168,7 +145,6 @@ export default function XcelTechSplitLogin() {
           }}
         />
 
-        {/* Logo top-left */}
         <div className="relative z-10 p-8">
           <div className="flex items-center gap-2.5">
             <NetworkIcon />
@@ -178,7 +154,6 @@ export default function XcelTechSplitLogin() {
           </div>
         </div>
 
-        {/* Bottom-left text */}
         <div className="relative z-10 mt-auto p-10 pb-12">
           <div className="w-10 h-1 mb-5 rounded-full" style={{ background: "#FFC107" }} />
           <h2 className="text-white font-bold text-3xl leading-snug mb-3" style={{ maxWidth: 340 }}>
@@ -198,22 +173,17 @@ export default function XcelTechSplitLogin() {
         </div>
       </div>
 
-      {/* RIGHT SIDE — form (unchanged except handleSubmit) */}
       <div className="w-full md:w-1/4 flex flex-col items-center justify-between py-8 px-6" style={{ background: "#F5F6FA" }}>
-
-        {/* Mobile logo */}
         <div className="md:hidden flex items-center gap-2 mb-6 self-start">
           <span className="font-black text-lg" style={{ color: "#1a2240" }}>
             XCEL<span style={{ color: "#FFC107" }}>TECH</span>
           </span>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="w-full flex flex-col justify-center flex-1">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h2>
           <p className="text-sm text-gray-400 mb-8">Sign in to your account</p>
 
-          {/* Email */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Username</label>
             <div className={`flex items-center border rounded-xl px-3 py-2.5 transition-all ${
@@ -232,7 +202,6 @@ export default function XcelTechSplitLogin() {
             </div>
           </div>
 
-          {/* Password */}
           <div className="mb-5">
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
             <div className={`flex items-center border rounded-xl px-3 py-2.5 transition-all ${
@@ -257,7 +226,6 @@ export default function XcelTechSplitLogin() {
             </div>
           </div>
 
-          {/* Remember + Forgot */}
           <div className="flex items-center justify-between mb-6">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
@@ -269,7 +237,6 @@ export default function XcelTechSplitLogin() {
             </button>
           </div>
 
-          {/* Sign In button */}
           <button
             type="submit"
             disabled={loading}
@@ -289,13 +256,12 @@ export default function XcelTechSplitLogin() {
             ) : "Sign In"}
           </button>
 
-          {/* Test credentials hint */}
-          <p className="text-center text-xs text-gray-400 mt-4">
+          {/* <p className="text-center text-xs text-gray-400 mt-4">
             Test: <span className="font-medium text-gray-600">emilys</span> / <span className="font-medium text-gray-600">emilyspass</span>
-          </p>
+          </p> */}
         </form>
 
-        <p className="text-gray-400 text-xs text-center mt-4">© 2025 XcelTech. All rights reserved.</p>
+        <p className="text-gray-400 text-xs text-center mt-4">© 2026 XcelTech. All rights reserved.</p>
       </div>
 
     </div>

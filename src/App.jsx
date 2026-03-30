@@ -8,9 +8,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { ROLES } from "./config/roles.jsx";
 import Designations from "./pages/Designations.jsx";
 
-// ── Layout wrapper ────────────────────────────
-//  "page" prop decides what renders in the content area
-// ─────────────────────────────────────────────
 function DashboardLayout({ page }) {
   const pages = {
     dashboard: <Dashboard />,

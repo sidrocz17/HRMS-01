@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 
 const EMPTY_FORM = {
-  dept_id:     "",
   dept_name:   "",
   description: "",
   is_active:   true,
@@ -13,7 +12,6 @@ export default function DepartmentForm({
   mode = "add",
   initial = null,
   existingNames = [],
-  existingDeptIds = [],
   submitting = false,   // ← loading state from parent
   apiError = "",        // ← error message from API
   onSubmit,
@@ -27,7 +25,6 @@ export default function DepartmentForm({
   useEffect(() => {
     if (isEdit && initial) {
       setForm({
-        dept_id:     initial.dept_id || "",
         dept_name:   initial.dept_name,
         description: initial.description,
         is_active:   initial.is_active,
@@ -52,15 +49,6 @@ export default function DepartmentForm({
       if (duplicate) newErrors.dept_name = "This department name already exists.";
     }
 
-    if (!form.dept_id.trim()) {
-      newErrors.dept_id = "Department ID is required.";
-    } else {
-      const duplicateId = existingDeptIds
-        .filter((id) => isEdit ? id !== initial?.dept_id : true)
-        .some((id) => id.toLowerCase() === form.dept_id.trim().toLowerCase());
-      if (duplicateId) newErrors.dept_id = "This department ID already exists.";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -69,8 +57,9 @@ export default function DepartmentForm({
     if (!validate()) return;
     onSubmit({
       ...form,
-      dept_id:   form.dept_id.trim().toUpperCase(),
       dept_name: form.dept_name.trim(),
+      description: form.description,
+       is_active:   form.is_active,
     });
   };
 
@@ -108,34 +97,6 @@ export default function DepartmentForm({
 
         {/* ── Body ── */}
         <div className="px-6 py-5 space-y-4">
-
-          {/* Department ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Department ID <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. DEPT-009"
-              value={form.dept_id}
-              onChange={(e) => handleChange("dept_id", e.target.value)}
-              disabled={submitting}
-              className={`w-full px-4 py-2.5 text-sm border rounded-xl outline-none transition-all
-                placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed
-                ${errors.dept_id
-                  ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                  : "border-gray-200 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
-                }`}
-            />
-            {errors.dept_id && (
-              <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {errors.dept_id}
-              </p>
-            )}
-          </div>
 
           {/* Department Name */}
           <div>

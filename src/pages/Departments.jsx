@@ -1,33 +1,17 @@
 // pages/Departments.jsx
-// ─────────────────────────────────────────────
-//  Department Management — full CRUD
-//  POST /add-department wired to real API
-// ─────────────────────────────────────────────
 
-import { useState, useMemo } from "react";
-import { v4 as uuidv4 } from "uuid";
-import StatusBadge      from "../components/employee/StatusBadge";
-import ActionButtons    from "../components/employee/ActionButtons";
-import DepartmentForm   from "../components/department/DepartmentForm";
-import DeleteConfirm    from "../components/department/DeleteConfirm";
-import { createDepartment } from "../api/departmentApi";   // ← API import
-
-// ── Mock seed data (replace with GET API later) ──
-const SEED = [
-  { id: uuidv4(), dept_id: "DEPT-001", dept_name: "Engineering",      description: "Product development and infrastructure.",      is_active: true,  created_at: "12 Dec, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-002", dept_name: "Human Resources",  description: "Recruitment, culture and employee relations.", is_active: true,  created_at: "10 Dec, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-003", dept_name: "Finance",          description: "Budgeting, payroll and financial reporting.",  is_active: true,  created_at: "08 Dec, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-004", dept_name: "Marketing",        description: "Brand strategy and digital campaigns.",        is_active: false, created_at: "05 Dec, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-005", dept_name: "Sales",            description: "Revenue generation and client management.",    is_active: true,  created_at: "01 Dec, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-006", dept_name: "Design",           description: "UI/UX design and brand identity.",             is_active: true,  created_at: "28 Nov, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-007", dept_name: "Customer Support", description: "Post-sales support and customer success.",     is_active: false, created_at: "20 Nov, 2023" },
-  { id: uuidv4(), dept_id: "DEPT-008", dept_name: "Legal",            description: "Contracts, compliance and regulatory.",        is_active: true,  created_at: "15 Nov, 2023" },
-];
+import { useState, useMemo, useEffect } from "react";
+import StatusBadge    from "../components/employee/StatusBadge";
+import ActionButtons  from "../components/employee/ActionButtons";
+import DepartmentForm from "../components/department/DepartmentForm";
+import DeleteConfirm  from "../components/department/DeleteConfirm";
+import { createDepartment, fetchDepartments } from "../api/departmentApi";
 
 const PAGE_SIZE = 7;
 
 export default function Departments() {
-  const [departments, setDepartments] = useState(SEED);
+  // ── Data state ────────────────────────────────
+  const [departments, setDepartments] = useState([]); // empty — GET API fills this
   const [search, setSearch]           = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,16 +22,47 @@ export default function Departments() {
   const [editTarget, setEditTarget]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // ── API state ────────────────────────────────
+  // ── API state ─────────────────────────────────
+  const [loading, setLoading]       = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
+
+  // ── Load departments on page open ─────────────
+  useEffect(() => {
+    loadDepartments();
+  }, []);
+
+  const loadDepartments = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchDepartments();
+      console.log("✅ Departments fetched:", data);
+
+      // ── Map API fields → table fields ─────────
+      // Check console log above and adjust keys if needed
+      const mapped = data.map((d) => ({
+        id:          d.id          || d.departmentId || d.dept_id,
+        dept_id:     d.deptId      || d.dept_id      || d.id,
+        dept_name:   d.title       || d.deptName     || d.dept_name,
+        description: d.description || "",
+        is_active:   d.isActive    ?? d.is_active    ?? true,
+        created_at:  d.createdAt   || d.created_at   || "",
+      }));
+
+      setDepartments(mapped);
+    } catch (error) {
+      console.error("❌ Failed to fetch departments:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
     departments.filter((d) =>
-      d.dept_name.toLowerCase().includes(search.toLowerCase()) ||
-      d.description.toLowerCase().includes(search.toLowerCase()) ||
-      d.dept_id.toLowerCase().includes(search.toLowerCase())
+      (d.dept_name  || "").toLowerCase().includes(search.toLowerCase()) ||
+      (d.description|| "").toLowerCase().includes(search.toLowerCase()) ||
+      (d.dept_id    || "").toLowerCase().includes(search.toLowerCase())
     ), [departments, search]
   );
 
@@ -84,7 +99,7 @@ export default function Departments() {
     setShowForm(true);
   };
 
-  // ── Form submit — wired to API for "add" ──────
+  // ── Form submit ───────────────────────────────
   const handleFormSubmit = async (formData) => {
     setSubmitting(true);
     setApiError("");
@@ -92,23 +107,14 @@ export default function Departments() {
     try {
       if (formMode === "add") {
 
-        // ── Call real API ──────────────────────
+        // ── 1. POST to API ─────────────────────
         const response = await createDepartment(formData);
         console.log("✅ Department created:", response);
+        // response = "Department added successfully"
 
-        // ── Add to local table immediately ─────
-        const now = new Date().toLocaleDateString("en-GB", {
-          day: "2-digit", month: "short", year: "numeric",
-        });
-
-        setDepartments((prev) => [{
-          id:          response.id || uuidv4(),
-          dept_id:     formData.dept_id,
-          dept_name:   formData.dept_name,
-          description: formData.description,
-          is_active:   formData.is_active,
-          created_at:  now,
-        }, ...prev]);
+        // ── 2. Refresh table from GET API ──────
+        await loadDepartments();
+        console.log("✅ Table refreshed");
 
       } else {
         // ── Edit: local only until PUT API ready ──
@@ -124,19 +130,15 @@ export default function Departments() {
         );
       }
 
-      // ── Success: close modal ───────────────────
       setShowForm(false);
       setCurrentPage(1);
 
     } catch (error) {
       console.error("❌ API Error:", error);
-
-      // ── Show error inside modal ────────────────
       const message =
         error.response?.data?.message ||
-        error.response?.data?.error ||
+        error.response?.data?.error   ||
         "Something went wrong. Please try again.";
-
       setApiError(message);
 
     } finally {
@@ -145,7 +147,7 @@ export default function Departments() {
   };
 
   // ── Delete handlers ───────────────────────────
-  const handleDeleteClick   = (dept) => setDeleteTarget(dept);
+  const handleDeleteClick = (dept) => setDeleteTarget(dept);
 
   const handleDeleteConfirm = () => {
     setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
@@ -158,13 +160,13 @@ export default function Departments() {
     setSelectedIds([]);
   };
 
-  // ── Toggle status ──────────────────────────────
+  // ── Toggle status ─────────────────────────────
   const handleToggleStatus = (id) =>
     setDepartments((prev) =>
       prev.map((d) => d.id === id ? { ...d, is_active: !d.is_active } : d)
     );
 
-  // ── Pagination ─────────────────────────────────
+  // ── Pagination ────────────────────────────────
   const getPageNumbers = () => {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
     if (currentPage <= 3) return [1, 2, 3, "...", totalPages];
@@ -172,8 +174,7 @@ export default function Departments() {
     return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
   };
 
-  const existingNames   = departments.map((d) => d.dept_name);
-  const existingDeptIds = departments.map((d) => d.dept_id);
+  const existingNames = departments.map((d) => d.dept_name);
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-8">
@@ -289,7 +290,22 @@ export default function Departments() {
             </thead>
 
             <tbody className="divide-y divide-gray-50">
-              {paginated.length === 0 ? (
+
+              {/* Loading spinner */}
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="flex items-center justify-center gap-2 text-gray-400">
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-sm">Loading departments...</span>
+                    </div>
+                  </td>
+                </tr>
+
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -304,6 +320,7 @@ export default function Departments() {
                     </div>
                   </td>
                 </tr>
+
               ) : paginated.map((dept) => {
                 const isSelected = selectedIds.includes(dept.id);
                 return (
@@ -325,7 +342,7 @@ export default function Departments() {
                     {/* Dept ID */}
                     <td className="px-4 py-4">
                       <span className="text-sm font-mono font-medium text-gray-500">
-                        {dept.dept_id}
+                        {dept.dept_id || "—"}
                       </span>
                     </td>
 
@@ -363,7 +380,7 @@ export default function Departments() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        {dept.created_at}
+                        {dept.created_at || "—"}
                       </div>
                     </td>
 
@@ -383,7 +400,7 @@ export default function Departments() {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* ── Pagination ── */}
         <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
           <p className="text-sm text-gray-500">
             Showing{" "}
@@ -440,7 +457,6 @@ export default function Departments() {
           mode={formMode}
           initial={editTarget}
           existingNames={existingNames}
-          existingDeptIds={existingDeptIds}
           submitting={submitting}
           apiError={apiError}
           onSubmit={handleFormSubmit}
