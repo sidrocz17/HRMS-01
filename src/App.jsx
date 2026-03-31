@@ -7,12 +7,16 @@ import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ROLES } from "./config/roles.jsx";
 import Designations from "./pages/Designations.jsx";
+import LeaveTypes from "./pages/LeaveTypes";
+import LeavePolicy from "./pages/LeavePolicy";
 
 function DashboardLayout({ page }) {
   const pages = {
     dashboard: <Dashboard />,
     departments: <Departments />,
     designation: <Designations />,
+    "leave-types": <LeaveTypes />,
+    "leave-policy": <LeavePolicy />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -60,6 +64,22 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <DashboardLayout page="designation" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leave-types"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <DashboardLayout page="leave-types" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leave-policy"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <DashboardLayout page="leave-policy" />
             </ProtectedRoute>
           }
         />

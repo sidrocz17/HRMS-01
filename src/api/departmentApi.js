@@ -32,6 +32,36 @@ export const createDepartment = async (formData) => {
   return response.data;
 };
 
+// ── PUT /department/:id ───────────────────────
+export const updateDepartment = async (id, formData) => {
+  const body = {
+    deptName:    formData.dept_name,
+    description: formData.description,
+    isActive:    String(formData.is_active),
+  };
+
+  const response = await axios.put(
+    `${BASE_URL}/department/${id}`,
+    body,
+    authHeaders()
+  );
+
+  console.log("📥 Update Response:", response.data);
+  return response.data;
+};
+
+// ── PUT /department/:id/deactivate ────────────
+export const deactivateDepartment = async (id) => {
+  const response = await axios.put(
+    `${BASE_URL}/department/${id}/deactivate`,
+    {},
+    authHeaders()
+  );
+
+  console.log("📥 Deactivate Response:", response.data);
+  return response.data;
+};
+
 // ── GET /departments ──────────────────────────
 export const fetchDepartments = async () => {
   const response = await axios.get(

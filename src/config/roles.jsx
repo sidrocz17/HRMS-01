@@ -84,11 +84,10 @@ export const MENU_CONFIG = {
       label: "Leave Management",
       icon: Icons.leave,
       children: [
-        "Apply Leave",
+        "My Leaves",
         "Leave Balance",
         "Approvals",
         "Requests",
-        "History",
       ],
     },
     {
@@ -103,7 +102,7 @@ export const MENU_CONFIG = {
         "Department",
         "Designation",
         "Leave Types",
-        "Company Policies",
+        "Leave Policy",
         "Attendance Settings",
         "Holiday",
       ],
@@ -144,11 +143,10 @@ export const MENU_CONFIG = {
       label: "Leave Management",
       icon: Icons.leave,
       children: [
-        "Apply Leave",
+        "My Leaves",
         "Approve Leave",
         "View All Requests",
         "Leave Balance",
-        "History",
       ],
     },
     {
@@ -174,9 +172,8 @@ export const MENU_CONFIG = {
       label: "Leave",
       icon: Icons.leave,
       children: [
-        "Apply Leave",
+        "My Leaves",
         "Leave Balance",
-        "History",
       ],
     },
     {
