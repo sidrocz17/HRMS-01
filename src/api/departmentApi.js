@@ -62,6 +62,17 @@ export const deactivateDepartment = async (id) => {
   return response.data;
 };
 
+// ── DELETE /department/:id ────────────────────
+export const deleteDepartment = async (id) => {
+  const response = await axios.delete(
+    `${BASE_URL}/department/${id}`,
+    authHeaders()
+  );
+
+  console.log("📥 Delete Response:", response.data);
+  return response.data;
+};
+
 // ── GET /departments ──────────────────────────
 export const fetchDepartments = async () => {
   const response = await axios.get(

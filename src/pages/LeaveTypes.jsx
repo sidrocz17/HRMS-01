@@ -9,18 +9,58 @@ import { useState, useMemo, useEffect } from "react";
 import StatusBadge   from "../components/employee/StatusBadge";
 import LeaveTypeForm from "../components/leavetype/LeaveTypeForm";
 import DeleteConfirm from "../components/leavetype/DeleteConfirm";
-import { createLeaveType, fetchLeaveTypes } from "../api/leaveTypeApi";
+import {
+  createLeaveType,
+  deleteLeaveType,
+  fetchLeaveTypes,
+} from "../api/leaveTypeApi";
 
 const PAGE_SIZE = 8;
+
+const normalizeBoolean = (...values) => {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "y", "active"].includes(normalized)) return true;
+      if (["false", "0", "no", "n", "inactive"].includes(normalized)) return false;
+    }
+  }
+  return false;
+};
+
+const mapLeaveType = (d) => ({
+  id: d.typeId || d.id || d.type_id,
+  type: d.type || d.leaveType || d.name || "",
+  max_consecutive_days: d.maxConsecutiveDays || d.max_consecutive_days || 0,
+  carry_forward_allowed: normalizeBoolean(
+    d.carryForwardAllowed,
+    d.carry_forward_allowed,
+    d.carryForward,
+    d.carry_forward,
+    d.isCarryForwardAllowed,
+    d.is_carry_forward_allowed
+  ),
+  post_application_allowed: normalizeBoolean(
+    d.postApplicationAllowed,
+    d.post_application_allowed,
+    d.postApplication,
+    d.post_application,
+    d.isPostApplicationAllowed,
+    d.is_post_application_allowed
+  ),
+});
 
 // ── Boolean badge ─────────────────────────────
 const BoolBadge = ({ value }) => (
   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
     value
       ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-      : "bg-gray-50 text-gray-500 ring-1 ring-gray-200"
+      : "bg-red-50 text-red-700 ring-1 ring-red-200"
   }`}>
-    <span className={`w-1.5 h-1.5 rounded-full ${value ? "bg-emerald-400" : "bg-gray-400"}`} />
+    <span className={`w-1.5 h-1.5 rounded-full ${value ? "bg-emerald-400" : "bg-red-400"}`} />
     {value ? "Yes" : "No"}
   </span>
 );
@@ -56,6 +96,7 @@ export default function LeaveTypes() {
   // ── API state ─────────────────────────────────
   const [loading, setLoading]       = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
 
   // ── Load on mount ─────────────────────────────
@@ -70,13 +111,7 @@ export default function LeaveTypes() {
       console.log("✅ Leave types fetched:", data);
 
       // Map API fields → local fields
-      const mapped = data.map((d) => ({
-        id:                      d.typeId        || d.id             || d.type_id,
-        type:                    d.type          || d.leaveType      || "",
-        max_consecutive_days:    d.maxConsecutiveDays || d.max_consecutive_days || 0,
-        carry_forward_allowed:   d.carryForwardAllowed  ?? d.carry_forward_allowed  ?? false,
-        post_application_allowed: d.postApplicationAllowed ?? d.post_application_allowed ?? false,
-      }));
+      const mapped = data.map(mapLeaveType);
 
       setLeaveTypes(mapped);
     } catch (error) {
@@ -157,16 +192,54 @@ export default function LeaveTypes() {
     }
   };
 
-  const handleDeleteClick   = (item) => setDeleteTarget(item);
-  const handleDeleteConfirm = () => {
-    setLeaveTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
-    setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
-    setDeleteTarget(null);
+  const handleDeleteClick = (item) => {
+    setApiError("");
+    setDeleteTarget(item);
   };
 
-  const handleBulkDelete = () => {
-    setLeaveTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
-    setSelectedIds([]);
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+
+    setDeleteSubmitting(true);
+    setApiError("");
+
+    try {
+      await deleteLeaveType(deleteTarget.id);
+      setLeaveTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("❌ Failed to delete leave type:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to delete leave type. Please try again.";
+      setApiError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    setDeleteSubmitting(true);
+    setApiError("");
+
+    try {
+      await Promise.all(selectedIds.map((id) => deleteLeaveType(id)));
+      setLeaveTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("❌ Failed to delete selected leave types:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to delete selected leave types. Please try again.";
+      setApiError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
   };
 
   // ── Pagination ────────────────────────────────
@@ -257,6 +330,7 @@ export default function LeaveTypes() {
           {selectedIds.length > 0 && (
             <button
               onClick={handleBulkDelete}
+              disabled={deleteSubmitting}
               className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition-all border border-red-200"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,8 +584,15 @@ export default function LeaveTypes() {
       {deleteTarget && (
         <DeleteConfirm
           itemName={deleteTarget.type}
+          submitting={deleteSubmitting}
+          error={apiError}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={() => {
+            if (!deleteSubmitting) {
+              setDeleteTarget(null);
+              setApiError("");
+            }
+          }}
         />
       )}
 

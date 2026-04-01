@@ -11,6 +11,8 @@ export default function DesignationForm({
   mode = "add",
   initial = null,
   existingTitles = [],
+  submitting = false,
+  apiError = "",
   onSubmit,
   onClose,
 }) {
@@ -53,7 +55,7 @@ export default function DesignationForm({
   };
 
   const handleBackdrop = (e) => {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget && !submitting) onClose();
   };
 
   return (
@@ -75,6 +77,7 @@ export default function DesignationForm({
           </div>
           <button
             onClick={onClose}
+            disabled={submitting}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +114,12 @@ export default function DesignationForm({
               </p>
             )}
           </div>
+
+          {apiError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {apiError}
+            </div>
+          ) : null}
 
           {/* Description */}
           <div>
@@ -158,15 +167,17 @@ export default function DesignationForm({
         <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
           <button
             onClick={onClose}
+            disabled={submitting}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
+            disabled={submitting}
             className="px-5 py-2 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm"
           >
-            {isEdit ? "Save Changes" : "Add Designation"}
+            {submitting ? "Saving..." : isEdit ? "Save Changes" : "Add Designation"}
           </button>
         </div>
 

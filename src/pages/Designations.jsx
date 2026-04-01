@@ -5,27 +5,49 @@
 //  UI matches Department page exactly
 // ─────────────────────────────────────────────
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import StatusBadge      from "../components/employee/StatusBadge";
 import DesignationForm  from "../components/designation/DesignationForm";
 import DeleteConfirm    from "../components/designation/DeleteConfirm";
-
-// ── Seed data ─────────────────────────────────
-const SEED = [
-  { id: uuidv4(), title: "Software Engineer",        description: "Develops and maintains software applications.",         is_active: true,  created_at: "12 Dec, 2023", updated_at: "15 Jan, 2024" },
-  { id: uuidv4(), title: "Senior Software Engineer", description: "Leads development of complex software systems.",        is_active: true,  created_at: "10 Dec, 2023", updated_at: "10 Dec, 2023" },
-  { id: uuidv4(), title: "Product Manager",          description: "Defines product vision and roadmap.",                  is_active: true,  created_at: "08 Dec, 2023", updated_at: "20 Jan, 2024" },
-  { id: uuidv4(), title: "UI/UX Designer",           description: "Designs user interfaces and experiences.",             is_active: true,  created_at: "05 Dec, 2023", updated_at: "05 Dec, 2023" },
-  { id: uuidv4(), title: "HR Manager",               description: "Manages HR operations and employee relations.",        is_active: false, created_at: "01 Dec, 2023", updated_at: "01 Dec, 2023" },
-  { id: uuidv4(), title: "Finance Analyst",          description: "Analyzes financial data and prepares reports.",        is_active: true,  created_at: "28 Nov, 2023", updated_at: "28 Nov, 2023" },
-  { id: uuidv4(), title: "DevOps Engineer",          description: "Manages CI/CD pipelines and infrastructure.",         is_active: true,  created_at: "20 Nov, 2023", updated_at: "22 Jan, 2024" },
-  { id: uuidv4(), title: "QA Engineer",              description: "Ensures product quality through testing.",             is_active: false, created_at: "15 Nov, 2023", updated_at: "15 Nov, 2023" },
-  { id: uuidv4(), title: "Business Analyst",         description: "Bridges business needs and technical solutions.",      is_active: true,  created_at: "10 Nov, 2023", updated_at: "10 Nov, 2023" },
-  { id: uuidv4(), title: "Tech Lead",                description: "Provides technical leadership to engineering teams.",  is_active: true,  created_at: "05 Nov, 2023", updated_at: "05 Nov, 2023" },
-];
+import {
+  createDesignation,
+  fetchDesignations,
+  updateDesignation,
+} from "../api/designationApi";
 
 const PAGE_SIZE = 8;
+
+const normalizeBoolean = (value, fallback = true) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  if (typeof value === "number") return value !== 0;
+  return fallback;
+};
+
+const normalizeDesignation = (designation, index = 0) => ({
+  id:
+    designation?.id ||
+    designation?.designationId ||
+    designation?.designation_id ||
+    `designation-${index}`,
+  title:
+    designation?.title ||
+    designation?.designationName ||
+    designation?.name ||
+    "Untitled Designation",
+  description: designation?.description || "",
+  is_active: normalizeBoolean(
+    designation?.isActive ?? designation?.is_active,
+    true
+  ),
+  created_at: designation?.createdAt || designation?.created_at || "",
+  updated_at: designation?.updatedAt || designation?.updated_at || "",
+});
 
 // ── Icon for designation rows ─────────────────
 const DesignationIcon = () => (
@@ -36,7 +58,7 @@ const DesignationIcon = () => (
 );
 
 export default function Designations() {
-  const [designations, setDesignations] = useState(SEED);
+  const [designations, setDesignations] = useState([]);
   const [search, setSearch]             = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "active" | "inactive"
   const [selectedIds, setSelectedIds]   = useState([]);
@@ -47,6 +69,45 @@ export default function Designations() {
   const [formMode, setFormMode]         = useState("add");
   const [editTarget, setEditTarget]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [loading, setLoading]           = useState(false);
+  const [submitting, setSubmitting]     = useState(false);
+  const [apiError, setApiError]         = useState("");
+
+  useEffect(() => {
+    loadDesignations();
+  }, []);
+
+  const loadDesignations = async () => {
+    setLoading(true);
+
+    try {
+      const data = await fetchDesignations();
+      console.log("✅ Designations fetched:", data);
+
+      const designationList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+      const mapped = designationList.map((designation, index) =>
+        normalizeDesignation(designation, index)
+      );
+
+      setDesignations((prev) => {
+        const fetchedIds = new Set(mapped.map((designation) => designation.id));
+        const missingLocalRows = prev.filter(
+          (designation) => !fetchedIds.has(designation.id)
+        );
+
+        return [...mapped, ...missingLocalRows];
+      });
+    } catch (error) {
+      console.error("❌ Failed to fetch designations:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
@@ -82,39 +143,82 @@ export default function Designations() {
   const handleAdd = () => {
     setFormMode("add");
     setEditTarget(null);
+    setApiError("");
     setShowForm(true);
   };
 
   const handleEdit = (d) => {
     setFormMode("edit");
     setEditTarget(d);
+    setApiError("");
     setShowForm(true);
   };
 
-  const handleFormSubmit = (formData) => {
+  const handleFormSubmit = async (formData) => {
+    setSubmitting(true);
+    setApiError("");
+
     const now = new Date().toLocaleDateString("en-GB", {
       day: "2-digit", month: "short", year: "numeric",
     });
-    if (formMode === "add") {
-      setDesignations((prev) => [{
-        id:          uuidv4(),
-        title:       formData.title,
-        description: formData.description,
-        is_active:   formData.is_active,
-        created_at:  now,
-        updated_at:  now,
-      }, ...prev]);
-    } else {
-      setDesignations((prev) =>
-        prev.map((d) =>
-          d.id === editTarget.id
-            ? { ...d, ...formData, updated_at: now }
-            : d
-        )
-      );
+
+    try {
+      if (formMode === "add") {
+        const response = await createDesignation(formData);
+        const createdDesignation = response?.data || response;
+
+        setDesignations((prev) => [{
+          id: createdDesignation?.id || createdDesignation?.designationId || uuidv4(),
+          title: createdDesignation?.title || createdDesignation?.designationName || formData.title,
+          description: createdDesignation?.description || formData.description,
+          is_active:
+            createdDesignation?.isActive ??
+            createdDesignation?.is_active ??
+            formData.is_active,
+          created_at: createdDesignation?.createdAt || createdDesignation?.created_at || now,
+          updated_at: createdDesignation?.updatedAt || createdDesignation?.updated_at || now,
+        }, ...prev]);
+      } else {
+        const response = await updateDesignation(editTarget.id, formData);
+        const updatedDesignation = response?.data || response;
+
+        setDesignations((prev) =>
+          prev.map((d) =>
+            d.id === editTarget.id
+              ? {
+                  ...d,
+                  title:
+                    updatedDesignation?.title ||
+                    updatedDesignation?.designationName ||
+                    formData.title,
+                  description:
+                    updatedDesignation?.description ?? formData.description,
+                  is_active:
+                    updatedDesignation?.isActive ??
+                    updatedDesignation?.is_active ??
+                    formData.is_active,
+                  updated_at:
+                    updatedDesignation?.updatedAt ||
+                    updatedDesignation?.updated_at ||
+                    now,
+                }
+              : d
+          )
+        );
+      }
+
+      setShowForm(false);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("❌ Failed to save designation:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to save designation. Please try again.";
+      setApiError(message);
+    } finally {
+      setSubmitting(false);
     }
-    setShowForm(false);
-    setCurrentPage(1);
   };
 
   const handleDeleteClick   = (d) => setDeleteTarget(d);
@@ -286,7 +390,19 @@ export default function Designations() {
 
             {/* Body */}
             <tbody className="divide-y divide-gray-50">
-              {paginated.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="flex items-center justify-center gap-2 text-gray-400">
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-sm">Loading designations...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -481,8 +597,15 @@ export default function Designations() {
           mode={formMode}
           initial={editTarget}
           existingTitles={existingTitles}
+          submitting={submitting}
+          apiError={apiError}
           onSubmit={handleFormSubmit}
-          onClose={() => setShowForm(false)}
+          onClose={() => {
+            if (!submitting) {
+              setShowForm(false);
+              setApiError("");
+            }
+          }}
         />
       )}
 

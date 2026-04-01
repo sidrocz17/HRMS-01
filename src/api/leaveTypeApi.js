@@ -11,19 +11,24 @@ const authHeaders = () => ({
   },
 });
 
-// ── POST /leave-type ──────────────────────────
+// ── POST /leaveType ───────────────────────────
 export const createLeaveType = async (formData) => {
+  const carryForwardAllowed = Boolean(formData.carry_forward_allowed);
+  const postApplicationAllowed = Boolean(formData.post_application_allowed);
+
   const body = {
-    type:                   formData.type,
-    maxConsecutiveDays:     Number(formData.max_consecutive_days),
-    carryForwardAllowed:    formData.carry_forward_allowed,
-    postApplicationAllowed: formData.post_application_allowed,
+    type:                     formData.type,
+    maxConsecutiveDays:       Number(formData.max_consecutive_days),
+    carryForwardAllowed,
+    carry_forward_allowed:    carryForwardAllowed,
+    postApplicationAllowed,
+    post_application_allowed: postApplicationAllowed,
   };
 
   console.log("📤 Sending to API:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/leave-type`,
+    `${BASE_URL}/leaveType`,
     body,
     authHeaders()
   );
@@ -32,10 +37,21 @@ export const createLeaveType = async (formData) => {
   return response.data;
 };
 
-// ── GET /leave-types ──────────────────────────
+// ── DELETE /leaveType/:id ─────────────────────
+export const deleteLeaveType = async (id) => {
+  const response = await axios.delete(
+    `${BASE_URL}/leaveType/${id}`,
+    authHeaders()
+  );
+
+  console.log("📥 Delete Leave Type Response:", response.data);
+  return response.data;
+};
+
+// ── GET /leaveTypes ───────────────────────────
 export const fetchLeaveTypes = async () => {
   const response = await axios.get(
-    `${BASE_URL}/leave-types`,
+    `${BASE_URL}/leaveTypes`,
     authHeaders()
   );
   return response.data;

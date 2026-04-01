@@ -5,7 +5,13 @@ import StatusBadge    from "../components/employee/StatusBadge";
 import ActionButtons  from "../components/employee/ActionButtons";
 import DepartmentForm from "../components/department/DepartmentForm";
 import DeleteConfirm  from "../components/department/DeleteConfirm";
-import { createDepartment, deactivateDepartment, fetchDepartments, updateDepartment } from "../api/departmentApi";
+import {
+  createDepartment,
+  deactivateDepartment,
+  deleteDepartment,
+  fetchDepartments,
+  updateDepartment,
+} from "../api/departmentApi";
 
 const PAGE_SIZE = 7;
 
@@ -45,6 +51,7 @@ export default function Departments() {
   // ── API state ─────────────────────────────────
   const [loading, setLoading]       = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
 
   // ── Load departments on page open ─────────────
@@ -167,17 +174,54 @@ export default function Departments() {
   };
 
   // ── Delete handlers ───────────────────────────
-  const handleDeleteClick = (dept) => setDeleteTarget(dept);
-
-  const handleDeleteConfirm = () => {
-    setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
-    setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
-    setDeleteTarget(null);
+  const handleDeleteClick = (dept) => {
+    setApiError("");
+    setDeleteTarget(dept);
   };
 
-  const handleBulkDelete = () => {
-    setDepartments((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
-    setSelectedIds([]);
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+
+    setDeleteSubmitting(true);
+    setApiError("");
+
+    try {
+      await deleteDepartment(deleteTarget.id);
+      setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("❌ Failed to delete department:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to delete department. Please try again.";
+      setApiError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    setDeleteSubmitting(true);
+    setApiError("");
+
+    try {
+      await Promise.all(selectedIds.map((id) => deleteDepartment(id)));
+      setDepartments((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("❌ Failed to delete selected departments:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to delete selected departments. Please try again.";
+      setApiError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
   };
 
   // ── Toggle status ─────────────────────────────
@@ -269,6 +313,7 @@ export default function Departments() {
           {selectedIds.length > 0 && (
             <button
               onClick={handleBulkDelete}
+              disabled={deleteSubmitting}
               className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition-all border border-red-200"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -514,8 +559,15 @@ export default function Departments() {
       {deleteTarget && (
         <DeleteConfirm
           deptName={deleteTarget.dept_name}
+          submitting={deleteSubmitting}
+          error={apiError}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={() => {
+            if (!deleteSubmitting) {
+              setDeleteTarget(null);
+              setApiError("");
+            }
+          }}
         />
       )}
 
