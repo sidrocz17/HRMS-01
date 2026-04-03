@@ -9,6 +9,7 @@ import { ROLES } from "./config/roles.jsx";
 import Designations from "./pages/Designations.jsx";
 import LeaveTypes from "./pages/LeaveTypes";
 import LeavePolicy from "./pages/LeavePolicy";
+import EmployeeTypes from "./pages/EmployeeTypes";
 
 function DashboardLayout({ page }) {
   const pages = {
@@ -17,6 +18,7 @@ function DashboardLayout({ page }) {
     designation: <Designations />,
     "leave-types": <LeaveTypes />,
     "leave-policy": <LeavePolicy />,
+    "employee-types": <EmployeeTypes />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -80,6 +82,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <DashboardLayout page="leave-policy" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-types"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <DashboardLayout page="employee-types" />
             </ProtectedRoute>
           }
         />

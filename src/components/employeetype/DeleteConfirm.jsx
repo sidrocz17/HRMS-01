@@ -1,8 +1,14 @@
 // src/components/employeetype/DeleteConfirm.jsx
 
-export default function DeleteConfirm({ itemName, onConfirm, onCancel }) {
+export default function DeleteConfirm({
+  itemName,
+  submitting = false,
+  error = "",
+  onConfirm,
+  onCancel,
+}) {
   const handleBackdrop = (e) => {
-    if (e.target === e.currentTarget) onCancel();
+    if (e.target === e.currentTarget && !submitting) onCancel();
   };
 
   return (
@@ -24,19 +30,26 @@ export default function DeleteConfirm({ itemName, onConfirm, onCancel }) {
             <span className="font-semibold text-gray-800">"{itemName}"</span>?
             This action cannot be undone.
           </p>
+          {error ? (
+            <p className="mt-3 w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-left text-xs text-red-700">
+              {error}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
           <button
             onClick={onCancel}
+            disabled={submitting}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
+            disabled={submitting}
             className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-xl transition-all shadow-sm"
           >
-            Yes, Delete
+            {submitting ? "Deleting..." : "Yes, Delete"}
           </button>
         </div>
       </div>

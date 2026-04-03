@@ -99,7 +99,10 @@ export default function XcelTechSplitLogin() {
         localStorage.setItem("role", userRole);
 
       localStorage.setItem("user", JSON.stringify({
-        id:        data.id || data.user?.id,
+        id:        data.id || data.user?.id || data.userId || data.user?.userId || data.uuid || data.user?.uuid || data.employeeId || data.user?.employeeId || data.empId || data.user?.empId,
+        userId:    data.userId || data.user?.userId || data.id || data.user?.id,
+        uuid:      data.uuid || data.user?.uuid,
+        employeeId: data.employeeId || data.user?.employeeId || data.empId || data.user?.empId,
         firstName: data.firstName || data.user?.firstName,
         lastName:  data.lastName || data.user?.lastName,
         email:     data.email || data.user?.email,

@@ -4,20 +4,23 @@ import { useState, useEffect } from "react";
 
 // ── Financial year options ────────────────────
 const FINANCIAL_YEARS = [
-  "2022-2023",
-  "2023-2024",
-  "2024-2025",
-  "2025-2026",
-  "2026-2027",
+  "2022-23",
+  "2023-24",
+  "2024-25",
+  "2025-26",
+  "2026-27",
 ];
 
 // ── Derive start/end dates from financial year ─
 export const deriveYearDates = (fy) => {
   if (!fy) return { start_date: "", end_date: "" };
-  const [startYear] = fy.split("-");
+  const [startYear, endSuffix = ""] = fy.split("-");
+  const endYear =
+    endSuffix.length === 2 ? `${startYear.slice(0, 2)}${endSuffix}` : endSuffix;
+
   return {
     start_date: `${startYear}-04-01`,
-    end_date:   `${Number(startYear) + 1}-03-31`,
+    end_date:   `${endYear || Number(startYear) + 1}-03-31`,
   };
 };
 
@@ -170,7 +173,7 @@ export default function LeavePolicyForm({
               <option value="">Select leave type...</option>
               {leaveTypes.map((lt) => (
                 <option key={lt.id} value={lt.id}>
-                  {lt.type || lt.name || lt.leaveType}
+                  {lt.label || lt.name || lt.title || lt.type || lt.leaveType}
                 </option>
               ))}
             </select>
@@ -191,7 +194,7 @@ export default function LeavePolicyForm({
               <option value="">Select employee type...</option>
               {employeeTypes.map((et) => (
                 <option key={et.id} value={et.id}>
-                  {et.type || et.name || et.employeeType}
+                  {et.label || et.name || et.title || et.type || et.employeeType}
                 </option>
               ))}
             </select>

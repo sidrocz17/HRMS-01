@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 
 const EMPTY_FORM = {
-  type_name: "",
-  is_active: true,
+  name:      "",
+  isActive:  true,
 };
 
 export default function EmployeeTypeForm({
@@ -20,11 +20,12 @@ export default function EmployeeTypeForm({
   const [errors, setErrors] = useState({});
   const isEdit = mode === "edit";
 
+  // ── Pre-fill in edit mode ─────────────────────
   useEffect(() => {
     if (isEdit && initial) {
       setForm({
-        type_name: initial.type_name,
-        is_active: initial.is_active,
+        name:     initial.name,
+        isActive: initial.isActive,
       });
     } else {
       setForm(EMPTY_FORM);
@@ -38,23 +39,21 @@ export default function EmployeeTypeForm({
 
   const validate = () => {
     const newErrors = {};
-
-    if (!form.type_name.trim()) {
-      newErrors.type_name = "Employee type name is required.";
+    if (!form.name.trim()) {
+      newErrors.name = "Employee type name is required.";
     } else {
       const duplicate = existingNames
-        .filter((n) => isEdit ? n !== initial?.type_name : true)
-        .some((n) => n.toLowerCase() === form.type_name.trim().toLowerCase());
-      if (duplicate) newErrors.type_name = "This employee type already exists.";
+        .filter((n) => isEdit ? n !== initial?.name : true)
+        .some((n) => n.toLowerCase() === form.name.trim().toLowerCase());
+      if (duplicate) newErrors.name = "This employee type already exists.";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = () => {
     if (!validate()) return;
-    onSubmit({ ...form, type_name: form.type_name.trim() });
+    onSubmit({ name: form.name.trim().toUpperCase(), isActive: form.isActive });
   };
 
   const handleBackdrop = (e) => {
@@ -94,32 +93,33 @@ export default function EmployeeTypeForm({
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
 
-          {/* Type Name */}
+          {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Employee Type Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g. Full Time"
-              value={form.type_name}
-              onChange={(e) => handleChange("type_name", e.target.value)}
+              placeholder="e.g. PERMANENT"
+              value={form.name}
+              onChange={(e) => handleChange("name", e.target.value)}
               disabled={submitting}
               className={`w-full px-4 py-2.5 text-sm border rounded-xl outline-none transition-all
-                placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed
-                ${errors.type_name
+                placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed uppercase
+                ${errors.name
                   ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
                   : "border-gray-200 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
                 }`}
             />
-            {errors.type_name && (
+            {errors.name && (
               <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
-                {errors.type_name}
+                {errors.name}
               </p>
             )}
+            <p className="mt-1 text-xs text-gray-400">Will be saved in uppercase (e.g. TRAINEE)</p>
           </div>
 
           {/* Status Toggle */}
@@ -127,21 +127,21 @@ export default function EmployeeTypeForm({
             <div>
               <p className="text-sm font-medium text-gray-700">Status</p>
               <p className="text-xs text-gray-400">
-                {form.is_active
+                {form.isActive
                   ? "Employee type is currently active"
                   : "Employee type is currently inactive"}
               </p>
             </div>
             <button
               type="button"
-              onClick={() => handleChange("is_active", !form.is_active)}
+              onClick={() => handleChange("isActive", !form.isActive)}
               disabled={submitting}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
-                form.is_active ? "bg-emerald-500" : "bg-gray-200"
+                form.isActive ? "bg-emerald-500" : "bg-gray-200"
               }`}
             >
               <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${
-                form.is_active ? "translate-x-6" : "translate-x-1"
+                form.isActive ? "translate-x-6" : "translate-x-1"
               }`} />
             </button>
           </div>

@@ -1,15 +1,19 @@
 // src/pages/EmployeeTypes.jsx
 // ─────────────────────────────────────────────
-//  Employee Type Management — full CRUD
-//  RBAC: admin only
-//  UI matches Department / Designation pages
+//  Employee Type Management
+//  GET response: { id, name, isActive, createdOn, createdBy, updatedOn, updatedBy }
+//  POST payload: { name, isActive, createdBy, updatedBy }
 // ─────────────────────────────────────────────
 
 import { useState, useMemo, useEffect } from "react";
-import { v4 as uuidv4 } from "uuid";
 import EmployeeTypeForm from "../components/employeetype/EmployeeTypeForm";
 import DeleteConfirm    from "../components/employeetype/DeleteConfirm";
-import { createEmployeeType, fetchEmployeeTypes } from "../api/employeeTypeApi";
+import {
+  createEmployeeType,
+  deleteEmployeeType,
+  fetchEmployeeTypes,
+  updateEmployeeType,
+} from "../api/employeeTypeApi";
 
 const PAGE_SIZE = 8;
 
@@ -38,14 +42,23 @@ const Tooltip = ({ text, children }) => (
   </div>
 );
 
+// ── Format date ───────────────────────────────
+const formatDate = (iso) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+};
+
 export default function EmployeeTypes() {
   // ── RBAC ──────────────────────────────────────
   const role = localStorage.getItem("role") || "";
 
   // ── Data state ────────────────────────────────
+  // Each item shape: { id, name, isActive, createdOn }
   const [employeeTypes, setEmployeeTypes] = useState([]);
   const [search, setSearch]               = useState("");
-  const [statusFilter, setStatusFilter]   = useState("all"); // "all" | "active" | "inactive"
+  const [statusFilter, setStatusFilter]   = useState("all");
   const [selectedIds, setSelectedIds]     = useState([]);
   const [currentPage, setCurrentPage]     = useState(1);
 
@@ -58,6 +71,7 @@ export default function EmployeeTypes() {
   // ── API state ─────────────────────────────────
   const [loading, setLoading]       = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
 
   // ── Load on mount ─────────────────────────────
@@ -69,24 +83,21 @@ export default function EmployeeTypes() {
     setLoading(true);
     try {
       const data = await fetchEmployeeTypes();
-      console.log("✅ Employee types fetched:", data);
+      console.log("✅ Raw GET response:", data);
 
-      const employeeTypeList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-          ? data.data
-          : [];
-
-      const mapped = employeeTypeList.map((d) => ({
-        id:        d.id             || d.employeeTypeId || d.employee_type_id || uuidv4(),
-        type_name: d.typeName       || d.type_name      || d.type             || "",
-        is_active: d.isActive       ?? d.is_active      ?? true,
-        created_on: d.createdOn     || d.created_on     || "",
+      // ── Map exactly to GET response fields ────
+      // GET returns: { id, name, isActive, createdOn, createdBy, updatedOn, updatedBy }
+      const mapped = data.map((d) => ({
+        id:        d.id,
+        name:      d.name,
+        isActive:  d.isActive,
+        createdOn: d.createdOn,
       }));
 
+      console.log("✅ Mapped:", mapped);
       setEmployeeTypes(mapped);
     } catch (error) {
-      console.error("❌ Failed to fetch employee types:", error);
+      console.error("❌ Failed to fetch:", error);
     } finally {
       setLoading(false);
     }
@@ -95,11 +106,11 @@ export default function EmployeeTypes() {
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
     employeeTypes.filter((d) => {
-      const matchSearch = (d.type_name || "").toLowerCase().includes(search.toLowerCase());
+      const matchSearch = (d.name || "").toLowerCase().includes(search.toLowerCase());
       const matchStatus =
         statusFilter === "all"      ? true :
-        statusFilter === "active"   ? d.is_active :
-        !d.is_active;
+        statusFilter === "active"   ? d.isActive :
+        !d.isActive;
       return matchSearch && matchStatus;
     }), [employeeTypes, search, statusFilter]
   );
@@ -121,7 +132,7 @@ export default function EmployeeTypes() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
 
-  // ── Open Add modal ────────────────────────────
+  // ── CRUD handlers ─────────────────────────────
   const handleAdd = () => {
     setFormMode("add");
     setEditTarget(null);
@@ -129,7 +140,6 @@ export default function EmployeeTypes() {
     setShowForm(true);
   };
 
-  // ── Open Edit modal ───────────────────────────
   const handleEdit = (item) => {
     setFormMode("edit");
     setEditTarget(item);
@@ -137,22 +147,35 @@ export default function EmployeeTypes() {
     setShowForm(true);
   };
 
-  // ── Form submit ───────────────────────────────
   const handleFormSubmit = async (formData) => {
     setSubmitting(true);
     setApiError("");
 
     try {
       if (formMode === "add") {
+        // formData = { name, isActive }
+        // API also needs createdBy/updatedBy — handled inside employeeTypeApi.js
         await createEmployeeType(formData);
         console.log("✅ Employee type created");
-        await loadEmployeeTypes();
+        await loadEmployeeTypes(); // refresh from GET
       } else {
-        // Local update until PUT API is ready
+        const response = await updateEmployeeType(editTarget.id, formData);
+        const updatedEmployeeType = response?.data || response;
+
         setEmployeeTypes((prev) =>
           prev.map((d) =>
             d.id === editTarget.id
-              ? { ...d, type_name: formData.type_name, is_active: formData.is_active }
+              ? {
+                  ...d,
+                  name:
+                    updatedEmployeeType?.name ||
+                    updatedEmployeeType?.typeName ||
+                    formData.name,
+                  isActive:
+                    updatedEmployeeType?.isActive ??
+                    updatedEmployeeType?.is_active ??
+                    formData.isActive,
+                }
               : d
           )
         );
@@ -163,34 +186,71 @@ export default function EmployeeTypes() {
 
     } catch (error) {
       console.error("❌ API Error:", error);
-      console.error("❌ API Error Response:", error.response?.data);
       const message =
         error.response?.data?.message ||
         error.response?.data?.error   ||
-        "Something went wrong. Please try again.";
+        `Error ${error.response?.status || ""}: Something went wrong.`;
       setApiError(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ── Toggle active/inactive ────────────────────
+  // ── Toggle status (local only) ────────────────
   const handleToggleStatus = (id) =>
     setEmployeeTypes((prev) =>
-      prev.map((d) => d.id === id ? { ...d, is_active: !d.is_active } : d)
+      prev.map((d) => d.id === id ? { ...d, isActive: !d.isActive } : d)
     );
 
   // ── Delete ────────────────────────────────────
-  const handleDeleteClick   = (item) => setDeleteTarget(item);
-  const handleDeleteConfirm = () => {
-    setEmployeeTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
-    setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
-    setDeleteTarget(null);
+  const handleDeleteClick = (item) => {
+    setApiError("");
+    setDeleteTarget(item);
   };
 
-  const handleBulkDelete = () => {
-    setEmployeeTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
-    setSelectedIds([]);
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+
+    setDeleteSubmitting(true);
+    setApiError("");
+
+    try {
+      await deleteEmployeeType(deleteTarget.id);
+      setEmployeeTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("❌ Failed to delete employee type:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        `Error ${error.response?.status || ""}: Failed to delete employee type.`;
+      setApiError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    setDeleteSubmitting(true);
+    setApiError("");
+
+    try {
+      await Promise.all(selectedIds.map((id) => deleteEmployeeType(id)));
+      setEmployeeTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("❌ Failed to delete selected employee types:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        `Error ${error.response?.status || ""}: Failed to delete selected employee types.`;
+      setApiError(message);
+    } finally {
+      setDeleteSubmitting(false);
+    }
   };
 
   // ── Pagination ────────────────────────────────
@@ -201,7 +261,7 @@ export default function EmployeeTypes() {
     return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
   };
 
-  const existingNames = employeeTypes.map((d) => d.type_name);
+  const existingNames = employeeTypes.map((d) => d.name);
 
   // ── Access Denied ─────────────────────────────
   if (role !== "admin") {
@@ -249,7 +309,6 @@ export default function EmployeeTypes() {
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
 
-        {/* Left — search + filter pills */}
         <div className="flex items-center gap-3 flex-1">
 
           {/* Search */}
@@ -283,8 +342,8 @@ export default function EmployeeTypes() {
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
             {[
               { value: "all",      label: "All",      count: employeeTypes.length },
-              { value: "active",   label: "Active",   count: employeeTypes.filter((d) => d.is_active).length },
-              { value: "inactive", label: "Inactive", count: employeeTypes.filter((d) => !d.is_active).length },
+              { value: "active",   label: "Active",   count: employeeTypes.filter((d) => d.isActive).length },
+              { value: "inactive", label: "Inactive", count: employeeTypes.filter((d) => !d.isActive).length },
             ].map((f) => (
               <button
                 key={f.value}
@@ -297,7 +356,9 @@ export default function EmployeeTypes() {
               >
                 {f.label}
                 <span className={`px-1.5 py-0.5 rounded-full text-xs ${
-                  statusFilter === f.value ? "bg-[#1a2240]/10 text-[#1a2240]" : "bg-gray-200 text-gray-500"
+                  statusFilter === f.value
+                    ? "bg-[#1a2240]/10 text-[#1a2240]"
+                    : "bg-gray-200 text-gray-500"
                 }`}>
                   {f.count}
                 </span>
@@ -307,11 +368,11 @@ export default function EmployeeTypes() {
 
         </div>
 
-        {/* Right */}
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <button
               onClick={handleBulkDelete}
+              disabled={deleteSubmitting}
               className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition-all border border-red-200"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,7 +396,6 @@ export default function EmployeeTypes() {
       {/* ── Table Card ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
-        {/* Selected bar */}
         {selectedIds.length > 0 && (
           <div className="px-6 py-2.5 bg-[#1a2240]/5 border-b border-[#1a2240]/10">
             <span className="text-sm font-medium text-[#1a2240]">
@@ -346,8 +406,6 @@ export default function EmployeeTypes() {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-
-            {/* Head */}
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
                 <th className="w-12 px-4 py-3.5">
@@ -358,7 +416,7 @@ export default function EmployeeTypes() {
                     className="w-4 h-4 rounded border-gray-300 accent-[#1a2240] cursor-pointer"
                   />
                 </th>
-                {["Employee Type", "Status", "Actions"].map((col) => (
+                {["Employee Type", "Status", "Created On", "Actions"].map((col) => (
                   <th key={col} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     {col}
                   </th>
@@ -366,13 +424,12 @@ export default function EmployeeTypes() {
               </tr>
             </thead>
 
-            {/* Body */}
             <tbody className="divide-y divide-gray-50">
 
               {/* Loading */}
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-16 text-center">
+                  <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex items-center justify-center gap-2 text-gray-400">
                       <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -385,7 +442,7 @@ export default function EmployeeTypes() {
 
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-16 text-center">
+                  <td colSpan={5} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
                       <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -411,8 +468,8 @@ export default function EmployeeTypes() {
                     className={`group transition-colors duration-100 ${
                       isSelected
                         ? "bg-[#1a2240]/3"
-                        : !item.is_active
-                        ? "hover:bg-gray-50/80 opacity-60"   // fade inactive rows
+                        : !item.isActive
+                        ? "hover:bg-gray-50/80 opacity-60"
                         : "hover:bg-gray-50/80"
                     }`}
                   >
@@ -426,50 +483,61 @@ export default function EmployeeTypes() {
                       />
                     </td>
 
-                    {/* Employee Type Name */}
+                    {/* Name — from GET: item.name */}
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          item.is_active ? "bg-[#1a2240]/10" : "bg-gray-100"
+                          item.isActive ? "bg-[#1a2240]/10" : "bg-gray-100"
                         }`}>
-                          <svg className={`w-4 h-4 ${item.is_active ? "text-[#1a2240]" : "text-gray-400"}`}
+                          <svg className={`w-4 h-4 ${item.isActive ? "text-[#1a2240]" : "text-gray-400"}`}
                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                               d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
                         </div>
-                        <span className="text-sm font-semibold text-gray-800">
-                          {item.type_name}
+                        <span className="text-sm font-semibold text-gray-800 tracking-wide">
+                          {item.name}
                         </span>
                       </div>
                     </td>
 
-                    {/* Status */}
+                    {/* Status — from GET: item.isActive */}
                     <td className="px-4 py-4">
                       <button
                         onClick={() => handleToggleStatus(item.id)}
                         title="Click to toggle status"
                         className="focus:outline-none"
                       >
-                        <StatusBadge active={item.is_active} />
+                        <StatusBadge active={item.isActive} />
                       </button>
+                    </td>
+
+                    {/* Created On — from GET: item.createdOn */}
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        {formatDate(item.createdOn)}
+                      </div>
                     </td>
 
                     {/* Actions */}
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-1">
 
-                        {/* Toggle activate/deactivate */}
-                        <Tooltip text={item.is_active ? "Deactivate" : "Activate"}>
+                        {/* Activate / Deactivate */}
+                        <Tooltip text={item.isActive ? "Deactivate" : "Activate"}>
                           <button
                             onClick={() => handleToggleStatus(item.id)}
                             className={`p-1.5 rounded-lg transition-all duration-150 ${
-                              item.is_active
+                              item.isActive
                                 ? "text-gray-400 hover:text-amber-600 hover:bg-amber-50"
                                 : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
                             }`}
                           >
-                            {item.is_active ? (
+                            {item.isActive ? (
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                                   d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
@@ -590,9 +658,16 @@ export default function EmployeeTypes() {
 
       {deleteTarget && (
         <DeleteConfirm
-          itemName={deleteTarget.type_name}
+          itemName={deleteTarget.name}
+          submitting={deleteSubmitting}
+          error={apiError}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={() => {
+            if (!deleteSubmitting) {
+              setDeleteTarget(null);
+              setApiError("");
+            }
+          }}
         />
       )}
 

@@ -11,6 +11,8 @@ import LeavePolicyForm, { deriveYearDates } from "../components/leavepolicy/Leav
 import DeleteConfirm                         from "../components/leavepolicy/DeleteConfirm";
 import {
   createLeavePolicy,
+  updateLeavePolicy,
+  deleteLeavePolicy,
   fetchLeavePolicies,
   fetchLeaveTypes,
   fetchEmployeeTypes,
@@ -35,7 +37,100 @@ const Tooltip = ({ text, children }) => (
 const getFYLabel = (start_date) => {
   if (!start_date) return "—";
   const year = new Date(start_date).getFullYear();
-  return `${year}-${year + 1}`;
+  return `${year}-${String(year + 1).slice(-2)}`;
+};
+
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.items)) return value.items;
+  return [];
+};
+
+const mapOption = (item = {}, idKeys = [], labelKeys = []) => ({
+  id: idKeys.map((key) => item?.[key]).find(Boolean) || "",
+  label: labelKeys.map((key) => item?.[key]).find(Boolean) || "",
+});
+
+const mapLeaveTypeOption = (item) =>
+  mapOption(item, ["id", "typeId", "type_id"], ["name", "title", "type", "leaveType"]);
+
+const mapEmployeeTypeOption = (item) =>
+  mapOption(item, ["id", "employeeTypeId", "employee_type_id"], ["name", "title", "type", "employeeType"]);
+
+const mapPolicyItem = (d = {}) => ({
+  id: d.policyId || d.id || d.policy_id || uuidv4(),
+  type_id: d.typeId || d.type_id || "",
+  employee_type_id: d.employeeTypeId || d.employee_type_id || "",
+  no_of_days: d.noOfDays ?? d.no_of_days ?? 0,
+  start_date: d.startDate || d.start_date || "",
+  end_date: d.endDate || d.end_date || "",
+  financial_year: getFYLabel(d.startDate || d.start_date),
+  leave_type_label: d.leaveTypeName || d.name || d.title || d.type || "",
+  employee_type_label: d.employeeTypeName || d.employeeType || d.name || d.title || "",
+});
+
+const decodeJwtPayload = (token) => {
+  try {
+    const [, payload = ""] = token.split(".");
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "="
+    );
+
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const getCreatedBy = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const token = localStorage.getItem("token");
+    const tokenPayload = token ? decodeJwtPayload(token) : null;
+
+    return (
+      user.id ||
+      user.userId ||
+      user.uuid ||
+      user.employeeId ||
+      user.empId ||
+      user.user_id ||
+      tokenPayload?.userId ||
+      tokenPayload?.id ||
+      tokenPayload?.sub ||
+      tokenPayload?.uid ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+};
+
+const getFinancialYearDates = (financialYear) => {
+  const normalizedYear = String(financialYear || "").trim();
+
+  if (!normalizedYear) {
+    return { startDate: "", endDate: "" };
+  }
+
+  const [rawStartYear = "", rawEndYear = ""] = normalizedYear.split("-");
+  const startYear = rawStartYear.trim();
+  const endSuffix = rawEndYear.trim();
+
+  if (!startYear || !endSuffix) {
+    return { startDate: "", endDate: "" };
+  }
+
+  const endYear =
+    endSuffix.length === 2 ? `${startYear.slice(0, 2)}${endSuffix}` : endSuffix;
+
+  return {
+    startDate: `${startYear}-04-01`,
+    endDate: `${endYear}-03-31`,
+  };
 };
 
 export default function LeavePolicy() {
@@ -70,45 +165,65 @@ export default function LeavePolicy() {
 
   const loadAll = async () => {
     setLoading(true);
+    setApiError("");
+
     try {
-      const [policiesData, leaveTypesData, employeeTypesData] = await Promise.all([
+      const [policiesResult, leaveTypesResult, employeeTypesResult] = await Promise.allSettled([
         fetchLeavePolicies(),
         fetchLeaveTypes(),
         fetchEmployeeTypes(),
       ]);
 
-      console.log("✅ Policies:", policiesData);
-      console.log("✅ Leave types:", leaveTypesData);
-      console.log("✅ Employee types:", employeeTypesData);
+      if (leaveTypesResult.status === "fulfilled") {
+        console.log("✅ Leave types:", leaveTypesResult.value);
+        setLeaveTypes(
+          toArray(leaveTypesResult.value)
+            .map(mapLeaveTypeOption)
+            .filter((item) => item.id)
+        );
+      } else {
+        console.error("❌ Failed to load leave types:", leaveTypesResult.reason);
+      }
 
-      // ── Map leave types ──────────────────────
-      setLeaveTypes(leaveTypesData.map((d) => ({
-        id:   d.typeId    || d.id    || d.type_id,
-        type: d.type      || d.name  || d.leaveType || "",
-      })));
+      if (employeeTypesResult.status === "fulfilled") {
+        console.log("✅ Employee types:", employeeTypesResult.value);
+        setEmployeeTypes(
+          toArray(employeeTypesResult.value)
+            .map(mapEmployeeTypeOption)
+            .filter((item) => item.id)
+        );
+      } else {
+        console.error("❌ Failed to load employee types:", employeeTypesResult.reason);
+      }
 
-      // ── Map employee types ───────────────────
-      setEmployeeTypes(employeeTypesData.map((d) => ({
-        id:   d.employeeTypeId || d.id   || d.employee_type_id,
-        type: d.type           || d.name || d.employeeType || "",
-      })));
+      if (policiesResult.status === "fulfilled") {
+        console.log("✅ Policies:", policiesResult.value);
+        setPolicies(toArray(policiesResult.value).map(mapPolicyItem));
+      } else {
+        console.error("❌ Failed to load policies:", policiesResult.reason);
+        setPolicies([]);
+      }
 
-      // ── Map policies ─────────────────────────
-      setPolicies(policiesData.map((d) => ({
-        id:               d.policyId        || d.id              || d.policy_id || uuidv4(),
-        type_id:          d.typeId          || d.type_id,
-        employee_type_id: d.employeeTypeId  || d.employee_type_id,
-        no_of_days:       d.noOfDays        || d.no_of_days       || 0,
-        start_date:       d.startDate       || d.start_date       || "",
-        end_date:         d.endDate         || d.end_date         || "",
-        financial_year:   getFYLabel(d.startDate || d.start_date),
-        // resolved labels for display
-        leave_type_label:    d.leaveTypeName    || d.type           || "",
-        employee_type_label: d.employeeTypeName || d.employeeType   || "",
-      })));
-
+      if (
+        leaveTypesResult.status === "rejected" &&
+        employeeTypesResult.status === "rejected"
+      ) {
+        const error = employeeTypesResult.reason || leaveTypesResult.reason;
+        setApiError(
+          error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Failed to load form dropdown data."
+        );
+      } else if (policiesResult.status === "rejected") {
+        setApiError(
+          policiesResult.reason?.response?.data?.message ||
+          policiesResult.reason?.response?.data?.error ||
+          "Leave policies could not be loaded, but you can still add a policy."
+        );
+      }
     } catch (error) {
-      console.error("❌ Failed to load data:", error);
+      console.error("❌ Unexpected load error:", error);
+      setApiError("Failed to load leave policy data.");
     } finally {
       setLoading(false);
     }
@@ -117,17 +232,7 @@ export default function LeavePolicy() {
   const loadPolicies = async () => {
     try {
       const data = await fetchLeavePolicies();
-      setPolicies(data.map((d) => ({
-        id:               d.policyId        || d.id              || d.policy_id || uuidv4(),
-        type_id:          d.typeId          || d.type_id,
-        employee_type_id: d.employeeTypeId  || d.employee_type_id,
-        no_of_days:       d.noOfDays        || d.no_of_days       || 0,
-        start_date:       d.startDate       || d.start_date       || "",
-        end_date:         d.endDate         || d.end_date         || "",
-        financial_year:   getFYLabel(d.startDate || d.start_date),
-        leave_type_label:    d.leaveTypeName    || d.type         || "",
-        employee_type_label: d.employeeTypeName || d.employeeType || "",
-      })));
+      setPolicies(toArray(data).map(mapPolicyItem));
     } catch (error) {
       console.error("❌ Failed to refresh policies:", error);
     }
@@ -135,7 +240,7 @@ export default function LeavePolicy() {
 
   // ── Helper: resolve labels from IDs ──────────
   const resolveLabel = (id, list) =>
-    list.find((i) => String(i.id) === String(id))?.type || id || "—";
+    list.find((i) => String(i.id) === String(id))?.label || id || "—";
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
@@ -187,12 +292,34 @@ export default function LeavePolicy() {
     setApiError("");
 
     try {
+      const typeId = formData?.type_id || "";
+      const employeeTypeId = formData?.employee_type_id || "";
+      const noOfDays = Number(formData?.no_of_days);
+      const { startDate, endDate } = getFinancialYearDates(formData?.financial_year);
+      const createdBy = getCreatedBy();
+
+      if (!typeId || !employeeTypeId || !formData?.financial_year || !Number.isFinite(noOfDays) || noOfDays <= 0) {
+        setApiError("All fields are required.");
+        return;
+      }
+
+      if (!startDate || !endDate) {
+        setApiError("Invalid financial year selected.");
+        return;
+      }
+
+      if (!createdBy) {
+        setApiError("Unable to identify the current user.");
+        return;
+      }
+
       const body = {
-        typeId:         formData.type_id,
-        employeeTypeId: formData.employee_type_id,
-        noOfDays:       formData.no_of_days,
-        startDate:      formData.start_date,
-        endDate:        formData.end_date,
+        typeId,
+        employeeTypeId,
+        noOfDays,
+        startDate,
+        endDate,
+        createdBy,
       };
 
       if (formMode === "add") {
@@ -200,20 +327,14 @@ export default function LeavePolicy() {
         console.log("✅ Policy created");
         await loadPolicies();
       } else {
-        // Local update until PUT API is ready
-        setPolicies((prev) =>
-          prev.map((p) =>
-            p.id === editTarget.id
-              ? {
-                  ...p,
-                  ...formData,
-                  financial_year:      formData.financial_year,
-                  leave_type_label:    resolveLabel(formData.type_id, leaveTypes),
-                  employee_type_label: resolveLabel(formData.employee_type_id, employeeTypes),
-                }
-              : p
-          )
-        );
+        if (!editTarget?.id) {
+          setApiError("Unable to identify the policy to update.");
+          return;
+        }
+
+        await updateLeavePolicy(editTarget.id, body);
+        console.log("✅ Policy updated");
+        await loadPolicies();
       }
 
       setShowForm(false);
@@ -232,15 +353,44 @@ export default function LeavePolicy() {
   };
 
   const handleDeleteClick   = (policy) => setDeleteTarget(policy);
-  const handleDeleteConfirm = () => {
-    setPolicies((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-    setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
-    setDeleteTarget(null);
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget?.id) {
+      setApiError("Unable to identify the policy to delete.");
+      return;
+    }
+
+    try {
+      setApiError("");
+      await deleteLeavePolicy(deleteTarget.id);
+      await loadPolicies();
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("❌ Delete API Error:", error);
+      setApiError(
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to delete leave policy."
+      );
+    }
   };
 
-  const handleBulkDelete = () => {
-    setPolicies((prev) => prev.filter((p) => !selectedIds.includes(p.id)));
-    setSelectedIds([]);
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    try {
+      setApiError("");
+      await Promise.all(selectedIds.map((id) => deleteLeavePolicy(id)));
+      await loadPolicies();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("❌ Bulk delete API Error:", error);
+      setApiError(
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to delete selected leave policies."
+      );
+    }
   };
 
   // ── Pagination ────────────────────────────────

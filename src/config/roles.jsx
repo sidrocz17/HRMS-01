@@ -101,6 +101,7 @@ export const MENU_CONFIG = {
       children: [
         "Department",
         "Designation",
+        "Employee Types",
         "Leave Types",
         "Leave Policy",
         "Attendance Settings",

@@ -47,6 +47,7 @@ const ROUTE_MAP = {
   "Designation":            "/designation",
   "Leave Types":            "/leave-types",
   "Leave Policy":           "/leave-policy",
+  "Employee Types": "/employee-types",
 
   "Company Policies":       "/policies",
   "Attendance Settings":    "/attendance-settings",
