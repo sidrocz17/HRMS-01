@@ -9,6 +9,8 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MENU_CONFIG, ROLE_META, ROLES } from "../config/roles.jsx";
+import { logoutUser } from "../api/authApi";
+import { clearSession } from "../utils/authStorage";
 
 // ── Route map — label → path ───────────────────
 //  Add new pages here as your project grows.
@@ -51,6 +53,7 @@ const ROUTE_MAP = {
 
   "Company Policies":       "/policies",
   "Attendance Settings":    "/attendance-settings",
+  "Holiday":                "/holidays",
   "Holiday Calendar":       "/holidays",
 
   // Reports
@@ -87,6 +90,7 @@ export default function Sidebar() {
 
   const [activeItem, setActiveItem] = useState(getActiveFromPath);
   const [expanded, setExpanded]     = useState({});
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const toggle = (label) =>
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -98,11 +102,20 @@ export default function Sidebar() {
   };
 
   // ── Logout ────────────────────────────────────
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("user");
-    navigate("/", { replace: true });
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      clearSession();
+    } finally {
+      navigate("/", { replace: true });
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -226,12 +239,13 @@ export default function Sidebar() {
       <div className="px-4 pb-6 pt-2 border-t border-white/10">
         <button
           onClick={handleLogout}
+          disabled={isLoggingOut}
           className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold text-sm py-3 rounded-xl transition-all duration-150"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
           </svg>
-          Log Out
+          {isLoggingOut ? "Logging out..." : "Log Out"}
         </button>
       </div>
 

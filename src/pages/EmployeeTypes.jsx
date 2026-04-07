@@ -10,6 +10,7 @@ import EmployeeTypeForm from "../components/employeetype/EmployeeTypeForm";
 import DeleteConfirm    from "../components/employeetype/DeleteConfirm";
 import {
   createEmployeeType,
+  deactivateEmployeeType,
   deleteEmployeeType,
   fetchEmployeeTypes,
   updateEmployeeType,
@@ -196,11 +197,28 @@ export default function EmployeeTypes() {
     }
   };
 
-  // ── Toggle status (local only) ────────────────
-  const handleToggleStatus = (id) =>
-    setEmployeeTypes((prev) =>
-      prev.map((d) => d.id === id ? { ...d, isActive: !d.isActive } : d)
-    );
+  // ── Deactivate status ──────────────────────────
+  const handleToggleStatus = async (item) => {
+    if (!item.isActive) return;
+
+    setApiError("");
+
+    try {
+      await deactivateEmployeeType(item.id);
+      setEmployeeTypes((prev) =>
+        prev.map((d) =>
+          d.id === item.id ? { ...d, isActive: false } : d
+        )
+      );
+    } catch (error) {
+      console.error("❌ Failed to deactivate employee type:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        `Error ${error.response?.status || ""}: Failed to deactivate employee type.`;
+      setApiError(message);
+    }
+  };
 
   // ── Delete ────────────────────────────────────
   const handleDeleteClick = (item) => {
@@ -504,9 +522,10 @@ export default function EmployeeTypes() {
                     {/* Status — from GET: item.isActive */}
                     <td className="px-4 py-4">
                       <button
-                        onClick={() => handleToggleStatus(item.id)}
-                        title="Click to toggle status"
-                        className="focus:outline-none"
+                        onClick={() => handleToggleStatus(item)}
+                        title={item.isActive ? "Click to deactivate" : "Inactive"}
+                        className="focus:outline-none disabled:cursor-not-allowed"
+                        disabled={!item.isActive}
                       >
                         <StatusBadge active={item.isActive} />
                       </button>
@@ -527,14 +546,15 @@ export default function EmployeeTypes() {
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-1">
 
-                        {/* Activate / Deactivate */}
-                        <Tooltip text={item.isActive ? "Deactivate" : "Activate"}>
+                        {/* Deactivate */}
+                        <Tooltip text={item.isActive ? "Deactivate" : "Inactive"}>
                           <button
-                            onClick={() => handleToggleStatus(item.id)}
+                            onClick={() => handleToggleStatus(item)}
+                            disabled={!item.isActive}
                             className={`p-1.5 rounded-lg transition-all duration-150 ${
                               item.isActive
                                 ? "text-gray-400 hover:text-amber-600 hover:bg-amber-50"
-                                : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+                                : "text-gray-300 cursor-not-allowed"
                             }`}
                           >
                             {item.isActive ? (

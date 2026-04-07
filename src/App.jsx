@@ -10,6 +10,8 @@ import Designations from "./pages/Designations.jsx";
 import LeaveTypes from "./pages/LeaveTypes";
 import LeavePolicy from "./pages/LeavePolicy";
 import EmployeeTypes from "./pages/EmployeeTypes";
+import HolidayCalendar from "./pages/HolidayCalendar";
+import AttendancePolicy from "./pages/AttendancePolicy";
 
 function DashboardLayout({ page }) {
   const pages = {
@@ -19,6 +21,8 @@ function DashboardLayout({ page }) {
     "leave-types": <LeaveTypes />,
     "leave-policy": <LeavePolicy />,
     "employee-types": <EmployeeTypes />,
+    holidays: <HolidayCalendar />,
+    "attendance-settings": <AttendancePolicy />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -90,6 +94,22 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <DashboardLayout page="employee-types" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/holidays"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <DashboardLayout page="holidays" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/attendance-settings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+              <DashboardLayout page="attendance-settings" />
             </ProtectedRoute>
           }
         />

@@ -90,6 +90,23 @@ export const deleteEmployeeType = async (id) => {
   return response.data;
 };
 
+// ── PATCH /api/employment-type/:id ───────────
+export const deactivateEmployeeType = async (id) => {
+  const userId = getUserId();
+  const body = {
+    isActive: "false",
+    updatedBy: userId,
+  };
+
+  console.log(`📤 PATCH /api/employment-type/${id}:`, body);
+  const response = await httpClient.patch(
+    `${BASE_URL}/employment-type/${id}`,
+    body
+  );
+  console.log("📥 Deactivate Response:", response.data);
+  return response.data;
+};
+
 // ── GET /api/employment-types ─────────────────
 // Returns: [{ id, name, isActive, createdOn, createdBy, updatedOn, updatedBy }]
 export const fetchEmployeeTypes = async () => {
