@@ -27,27 +27,27 @@ export const fetchAttendancePolicy = async () => {
   return MOCK_POLICY;
 };
 
-// ── PUT /api/attendance-policy ────────────────
-// Updates the attendance policy (admin only)
+// ── POST /api/attendance-policy ───────────────
+// Creates the attendance policy (admin only)
 // Request body: { minInTime, minOutTime, minWorkingHour, halfDayHour }
-export const updateAttendancePolicy = async (payload) => {
-  // TODO: integrate real API
-  // const userId = getUserId();
-  // const response = await axios.put(
-  //   `${BASE_URL}/attendance-policy`,
-  //   {
-  //     minInTime:       payload.min_in_time,
-  //     minOutTime:      payload.min_out_time,
-  //     minWorkingHour:  Number(payload.min_working_hour),
-  //     halfDayHour:     Number(payload.half_day_hour),
-  //     updatedBy:       userId,
-  //   },
-  //   authHeaders()
-  // );
-  // return response.data;
+export const createAttendancePolicy = async (payload) => {
+  const userId = getUserId();
+  const body = {
+    minInTime: payload.min_in_time,
+    minOutTime: payload.min_out_time,
+    minWorkingHour: Number(payload.min_working_hour),
+    halfDayHour: Number(payload.half_day_hour),
+    createdBy: userId,
+    updatedBy: userId,
+  };
 
-  console.log("📤 Updating attendance policy:", payload);
-  return { message: "Attendance policy updated successfully" };
+  console.log("📤 Creating attendance policy:", body);
+  const response = await axios.post(
+    `${BASE_URL}/attendance-policy`,
+    body,
+    authHeaders()
+  );
+  return response.data;
 };
 
 // ── GET /api/attendance-policy/history ────────

@@ -10,9 +10,9 @@
 import { useState, useEffect } from "react";
 import AttendancePolicyForm from "../components/attendance/AttendancePolicyForm";
 import {
+  createAttendancePolicy,
   fetchAttendancePolicy,
   fetchAttendancePolicyHistory,
-  updateAttendancePolicy,
 } from "../api/attendancePolicyApi";
 
 // ── Format 24hr time → 12hr display ──────────
@@ -89,6 +89,38 @@ export default function AttendancePolicy() {
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
 
+  const normalizePolicy = (item) => {
+    if (!item) return null;
+
+    return {
+      id: item.id || item.policyId || item.uuid || "",
+      minInTime: item.minInTime || item.min_in_time || "",
+      minOutTime: item.minOutTime || item.min_out_time || "",
+      minWorkingHour:
+        item.minWorkingHour ??
+        item.min_working_hour ??
+        item.workingHours ??
+        "",
+      halfDayHour:
+        item.halfDayHour ??
+        item.half_day_hour ??
+        item.halfDayHours ??
+        "",
+      updatedBy:
+        item.updatedBy ||
+        item.updated_by ||
+        item.createdBy ||
+        item.created_by ||
+        "",
+      updatedOn:
+        item.updatedOn ||
+        item.updated_on ||
+        item.createdOn ||
+        item.created_on ||
+        "",
+    };
+  };
+
   // ── Load data on mount ────────────────────────
   useEffect(() => {
     loadAll();
@@ -103,7 +135,7 @@ export default function AttendancePolicy() {
       ]);
       console.log("✅ Policy:", policyData);
       console.log("✅ History:", historyData);
-      setPolicy(policyData);
+      setPolicy(normalizePolicy(policyData));
       setHistory(historyData);
     } catch (err) {
       console.error("❌ Failed to load attendance policy:", err);
@@ -112,21 +144,49 @@ export default function AttendancePolicy() {
     }
   };
 
-  // ── Edit submit handler ───────────────────────
+  // ── Add / edit submit handler ─────────────────
   const handleFormSubmit = async (formData) => {
     setSubmitting(true);
     setApiError("");
     try {
-      await updateAttendancePolicy(formData);
-      console.log("✅ Policy updated");
-      await loadAll();   // refresh both policy + history
+      const response = await createAttendancePolicy(formData);
+      const savedPolicy = normalizePolicy(response?.data || response);
+
+      setPolicy(
+        savedPolicy || {
+          id: policy?.id || "",
+          minInTime: formData.min_in_time,
+          minOutTime: formData.min_out_time,
+          minWorkingHour: Number(formData.min_working_hour),
+          halfDayHour: Number(formData.half_day_hour),
+          updatedBy: "",
+          updatedOn: new Date().toISOString(),
+        }
+      );
+
+      if (savedPolicy) {
+        setHistory((prev) => [
+          {
+            id: savedPolicy.id || `policy-${Date.now()}`,
+            date: (savedPolicy.updatedOn || new Date().toISOString()).slice(0, 10),
+            updatedBy: savedPolicy.updatedBy || "—",
+            minInTime: savedPolicy.minInTime,
+            minOutTime: savedPolicy.minOutTime,
+            workingHours: savedPolicy.minWorkingHour,
+            halfDayHours: savedPolicy.halfDayHour,
+          },
+          ...prev,
+        ]);
+      }
+
+      console.log("✅ Policy created");
       setShowForm(false);
     } catch (err) {
-      console.error("❌ Update error:", err);
+      console.error("❌ Save error:", err);
       const msg =
         err.response?.data?.message ||
         err.response?.data?.error   ||
-        "Failed to update policy. Please try again.";
+        "Failed to save policy. Please try again.";
       setApiError(msg);
     } finally {
       setSubmitting(false);
@@ -188,7 +248,7 @@ export default function AttendancePolicy() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              Edit Policy
+              {policy ? "Edit Policy" : "Add Policy"}
             </button>
           )}
         </div>

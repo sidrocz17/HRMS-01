@@ -28,6 +28,7 @@ export default function AttendancePolicyForm({
 }) {
   const [form, setForm]     = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
+  const isEdit = Boolean(initial);
 
   // ── Pre-fill form with current policy ────────
   useEffect(() => {
@@ -120,8 +121,14 @@ export default function AttendancePolicyForm({
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Edit Attendance Policy</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Update working hours and time rules</p>
+            <h2 className="text-base font-bold text-gray-900">
+              {isEdit ? "Edit Attendance Policy" : "Add Attendance Policy"}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isEdit
+                ? "Update working hours and time rules"
+                : "Set working hours and time rules"}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -269,7 +276,7 @@ export default function AttendancePolicyForm({
                 Saving...
               </span>
             ) : (
-              "Save Policy"
+              isEdit ? "Save Policy" : "Add Policy"
             )}
           </button>
         </div>
