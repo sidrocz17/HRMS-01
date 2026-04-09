@@ -8,6 +8,7 @@
 import axios from "axios";
 
 const BASE_URL = "/api";
+const DEFAULT_HOLIDAY_TYPE = "National Holiday";
 
 const authHeaders = () => ({
   headers: {
@@ -26,94 +27,100 @@ const getUserId = () => {
   }
 };
 
-// ── GET /api/holidays?year=YYYY ───────────────
+const isHolidayActive = (holiday) => {
+  if (holiday?.isActive === undefined && holiday?.is_active === undefined) {
+    return true;
+  }
+
+  return holiday?.isActive === true || holiday?.is_active === true;
+};
+
+// ── GET /api/holidays ─────────────────────────
 // Returns: Array of holiday objects for the given year
 // Response shape: [{ holidayId, holidayName, holidayDate, holidayType, calendarYear, ... }]
 export const getHolidays = async (year) => {
-  // TODO: integrate API
-  // const response = await axios.get(
-  //   `${BASE_URL}/holidays?year=${year}`,
-  //   authHeaders()
-  // );
-  // return response.data;
+  const response = await axios.get(`${BASE_URL}/holidays`, authHeaders());
+  const holidays = Array.isArray(response.data) ? response.data.filter(isHolidayActive) : [];
 
-  console.log(`📋 Fetching holidays for year: ${year}`);
-  return MOCK_HOLIDAYS.filter((h) => h.calendarYear === year);
+  if (!year) return holidays;
+
+  return holidays.filter((h) => {
+    const holidayYear = h.calendarYear || h.calendar_year;
+    return Number(holidayYear) === Number(year);
+  });
 };
 
 // ── POST /api/holiday ─────────────────────────
 // Request body: { holidayName, holidayDate, holidayType, calendarYear, createdBy, updatedBy }
 // Response: { message: "Holiday added successfully" } or new holiday object
 export const createHoliday = async (payload) => {
-  // TODO: integrate API
-  // const userId = getUserId();
-  // const response = await axios.post(
-  //   `${BASE_URL}/holiday`,
-  //   {
-  //     holidayName: payload.holidayName,
-  //     holidayDate: payload.holidayDate,
-  //     holidayType: Number(payload.holidayType),
-  //     calendarYear: payload.calendarYear,
-  //     createdBy: userId,
-  //     updatedBy: userId,
-  //   },
-  //   authHeaders()
-  // );
-  // return response.data;
-
-  console.log("📤 Creating holiday:", payload, "userId:", getUserId());
-  return { message: "Holiday added successfully" };
+  const userId = getUserId();
+  const response = await axios.post(
+    `${BASE_URL}/holiday`,
+    {
+      holidayName: payload.holidayName,
+      holidayDate: payload.holidayDate,
+      holidayType: payload.holidayType,
+      calendarYear: payload.calendarYear,
+      createdBy: userId,
+      updatedBy: userId,
+    },
+    authHeaders()
+  );
+  return response.data;
 };
 
 // ── PUT /api/holiday/:id ──────────────────────
 // Request body: { holidayName, holidayDate, holidayType, calendarYear, updatedBy }
 // Response: { message: "Holiday updated successfully" } or updated object
 export const updateHoliday = async (id, payload) => {
-  // TODO: integrate API
-  // const userId = getUserId();
-  // const response = await axios.put(
-  //   `${BASE_URL}/holiday/${id}`,
-  //   {
-  //     holidayName: payload.holidayName,
-  //     holidayDate: payload.holidayDate,
-  //     holidayType: Number(payload.holidayType),
-  //     calendarYear: payload.calendarYear,
-  //     updatedBy: userId,
-  //   },
-  //   authHeaders()
-  // );
-  // return response.data;
-
-  console.log(`📤 Updating holiday [${id}]:`, payload, "userId:", getUserId());
-  return { message: "Holiday updated successfully" };
+  const userId = getUserId();
+  const response = await axios.put(
+    `${BASE_URL}/holiday/${id}`,
+    {
+      holidayName: payload.holidayName,
+      holidayDate: payload.holidayDate,
+      holidayType: payload.holidayType,
+      calendarYear: payload.calendarYear,
+      updatedBy: userId,
+    },
+    authHeaders()
+  );
+  return response.data;
 };
 
 // ── DELETE /api/holiday/:id ───────────────────
 // Response: { message: "Holiday deleted successfully" }
 export const deleteHoliday = async (id) => {
-  // TODO: integrate API
-  // const response = await axios.delete(
-  //   `${BASE_URL}/holiday/${id}`,
-  //   authHeaders()
-  // );
-  // return response.data;
-
-  console.log(`🗑️ Deleting holiday [${id}]`);
-  return { message: "Holiday deleted successfully" };
+  const response = await axios.delete(
+    `${BASE_URL}/holiday/${id}`,
+    authHeaders()
+  );
+  return response.data;
 };
 
 // ── Holiday type mapping ──────────────────────
 export const HOLIDAY_TYPES = {
-  1: { label: "National Holiday", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200", dot: "bg-blue-400" },
-  2: { label: "Optional Holiday", color: "bg-amber-50 text-amber-700 ring-1 ring-amber-200", dot: "bg-amber-400" },
-  3: { label: "Company Holiday", color: "bg-violet-50 text-violet-700 ring-1 ring-violet-200", dot: "bg-violet-400" },
+  "National Holiday": { label: "National Holiday", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200", dot: "bg-blue-400" },
+  "Optional Holiday": { label: "Optional Holiday", color: "bg-amber-50 text-amber-700 ring-1 ring-amber-200", dot: "bg-amber-400" },
+  "Company Holiday": { label: "Company Holiday", color: "bg-violet-50 text-violet-700 ring-1 ring-violet-200", dot: "bg-violet-400" },
 };
 
 export const HOLIDAY_TYPE_OPTIONS = [
-  { value: "1", label: "National Holiday" },
-  { value: "2", label: "Optional Holiday" },
-  { value: "3", label: "Company Holiday" },
+  { value: "National Holiday", label: "National Holiday" },
+  { value: "Optional Holiday", label: "Optional Holiday" },
+  { value: "Company Holiday", label: "Company Holiday" },
 ];
+
+export const normalizeHolidayType = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (normalized === "1" || normalized === "national holiday") return "National Holiday";
+  if (normalized === "2" || normalized === "optional holiday") return "Optional Holiday";
+  if (normalized === "3" || normalized === "company holiday") return "Company Holiday";
+
+  return value || DEFAULT_HOLIDAY_TYPE;
+};
 
 // ── Generate year options (current ± 2) ───────
 export const getYearOptions = () => {
@@ -122,19 +129,3 @@ export const getYearOptions = () => {
 };
 
 // ── MOCK DATA — remove when GET API is ready ──
-const MOCK_HOLIDAYS = [
-  { holidayId: "1", holidayName: "New Year's Day", holidayDate: "2026-01-01", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "2", holidayName: "Republic Day", holidayDate: "2026-01-26", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "3", holidayName: "Holi", holidayDate: "2026-03-25", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "4", holidayName: "Good Friday", holidayDate: "2026-04-03", holidayType: 2, calendarYear: 2026 },
-  { holidayId: "5", holidayName: "Eid ul-Fitr", holidayDate: "2026-04-10", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "6", holidayName: "Annual Company Day", holidayDate: "2026-05-15", holidayType: 3, calendarYear: 2026 },
-  { holidayId: "7", holidayName: "Independence Day", holidayDate: "2026-08-15", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "8", holidayName: "Gandhi Jayanti", holidayDate: "2026-10-02", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "9", holidayName: "Diwali", holidayDate: "2026-11-08", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "10", holidayName: "Company Fest Day", holidayDate: "2026-12-01", holidayType: 3, calendarYear: 2026 },
-  { holidayId: "11", holidayName: "Christmas Day", holidayDate: "2026-12-25", holidayType: 1, calendarYear: 2026 },
-  { holidayId: "12", holidayName: "New Year's Eve", holidayDate: "2026-12-31", holidayType: 2, calendarYear: 2026 },
-  { holidayId: "13", holidayName: "New Year's Day", holidayDate: "2025-01-01", holidayType: 1, calendarYear: 2025 },
-  { holidayId: "14", holidayName: "Republic Day", holidayDate: "2025-01-26", holidayType: 1, calendarYear: 2025 },
-];

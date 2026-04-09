@@ -31,13 +31,10 @@ const ROUTE_MAP = {
   "Onboarding & Offboarding": "/employees",
 
   // Leave Management
-  "Apply Leave":            "/leave/apply",
-  "Leave Balance":          "/leave/balance",
-  "Approvals":              "/leave/approvals",
-  "Approve Leave":          "/leave/approvals",
-  "View All Requests":      "/leave/approvals",
-  "Requests":               "/leave/approvals",
-  "History":                "/leave/history",
+  "Apply Leave":        "/leave-management",
+  "My Leaves":          "/leave-management",
+  "Team Leaves":        "/leave-management",
+  "Leave Management":   "/leave-management",
 
   // My Attendance
   "Attendance Dashboard":   "/attendance",

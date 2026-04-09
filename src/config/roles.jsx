@@ -6,13 +6,15 @@
 
 // ── 1. Role constants ──────────────────────────
 export const ROLES = {
-  ADMIN:    "admin",
-  HR:       "hr",
+  ADMIN: "admin",
+  HR: "hr",
   EMPLOYEE: "employee",
 };
 
 export const normalizeRole = (role) => {
-  const normalized = String(role || "").trim().toLowerCase();
+  const normalized = String(role || "")
+    .trim()
+    .toLowerCase();
 
   if (normalized === "admin") return ROLES.ADMIN;
   if (normalized === "hr") return ROLES.HR;
@@ -40,23 +42,39 @@ const Icons = {
   ),
   attendance: (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+      <path
+        fillRule="evenodd"
+        d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+        clipRule="evenodd"
+      />
     </svg>
   ),
   admin: (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clipRule="evenodd" />
+      <path
+        fillRule="evenodd"
+        d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z"
+        clipRule="evenodd"
+      />
     </svg>
   ),
   payroll: (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
       <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
-      <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
+      <path
+        fillRule="evenodd"
+        d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+        clipRule="evenodd"
+      />
     </svg>
   ),
   reports: (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      <path
+        fillRule="evenodd"
+        d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+        clipRule="evenodd"
+      />
     </svg>
   ),
   onboarding: (
@@ -72,7 +90,6 @@ const Icons = {
 // ──────────────────────────────────────────────
 
 export const MENU_CONFIG = {
-
   // ── ADMIN: full access ──────────────────────
   [ROLES.ADMIN]: [
     {
@@ -83,12 +100,7 @@ export const MENU_CONFIG = {
     {
       label: "Leave Management",
       icon: Icons.leave,
-      children: [
-        "My Leaves",
-        "Leave Balance",
-        "Approvals",
-        "Requests",
-      ],
+      children: ["Apply Leave", "My Leaves", "Team Leaves"],
     },
     {
       label: "My Attendance",
@@ -116,11 +128,7 @@ export const MENU_CONFIG = {
     {
       label: "Reports",
       icon: Icons.reports,
-      children: [
-        "Employee Report",
-        "Attendance Report",
-        "Performance Report",
-      ],
+      children: ["Employee Report", "Attendance Report", "Performance Report"],
     },
   ],
 
@@ -143,12 +151,7 @@ export const MENU_CONFIG = {
     {
       label: "Leave Management",
       icon: Icons.leave,
-      children: [
-        "My Leaves",
-        "Approve Leave",
-        "View All Requests",
-        "Leave Balance",
-      ],
+      children: ["Apply Leave", "My Leaves", "Team Leaves"],
     },
     {
       label: "My Attendance",
@@ -172,10 +175,7 @@ export const MENU_CONFIG = {
     {
       label: "Leave",
       icon: Icons.leave,
-      children: [
-        "My Leaves",
-        "Leave Balance",
-      ],
+      children: ["Apply Leave", "My Leaves"],
     },
     {
       label: "My Attendance",
@@ -193,8 +193,8 @@ export const MENU_CONFIG = {
 // ── 4. Role redirect map ───────────────────────
 //  Where each role lands after login
 export const ROLE_REDIRECT = {
-  [ROLES.ADMIN]:    "/dashboard",
-  [ROLES.HR]:       "/dashboard",
+  [ROLES.ADMIN]: "/dashboard",
+  [ROLES.HR]: "/dashboard",
   [ROLES.EMPLOYEE]: "/dashboard",
 };
 

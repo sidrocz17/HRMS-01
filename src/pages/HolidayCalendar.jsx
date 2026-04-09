@@ -10,6 +10,7 @@ import { useHolidays }   from "../components/holiday/useHolidays";
 import HolidayForm       from "../components/holiday/HolidayForm";
 import DeleteConfirm     from "../components/holiday/DeleteConfirm";
 import { HOLIDAY_TYPES, getYearOptions } from "../api/holidayApi";
+import { normalizeRole } from "../config/roles.jsx";
 
 const PAGE_SIZE = 10;
 
@@ -28,7 +29,7 @@ const Tooltip = ({ text, children }) => (
 
 // ── Holiday type badge ────────────────────────
 const TypeBadge = ({ type }) => {
-  const config = HOLIDAY_TYPES[type] || HOLIDAY_TYPES[1];
+  const config = HOLIDAY_TYPES[type] || HOLIDAY_TYPES["National Holiday"];
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${config.color}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
@@ -66,7 +67,7 @@ const getDaysUntil = (dateStr) => {
 
 export default function HolidayCalendar() {
   // ── RBAC ──────────────────────────────────────
-  const role = localStorage.getItem("role") || "";
+  const role = normalizeRole(localStorage.getItem("role"));
   const isAdmin = role === "admin";
 
   // ── Year ──────────────────────────────────────
@@ -106,9 +107,9 @@ export default function HolidayCalendar() {
   // ── Summary counts ────────────────────────────
   const counts = useMemo(() => ({
     total:    holidays.length,
-    national: holidays.filter((h) => h.holidayType === 1).length,
-    optional: holidays.filter((h) => h.holidayType === 2).length,
-    company:  holidays.filter((h) => h.holidayType === 3).length,
+    national: holidays.filter((h) => h.holidayType === "National Holiday").length,
+    optional: holidays.filter((h) => h.holidayType === "Optional Holiday").length,
+    company:  holidays.filter((h) => h.holidayType === "Company Holiday").length,
   }), [holidays]);
 
   // ── Upcoming holiday ──────────────────────────
@@ -143,8 +144,10 @@ export default function HolidayCalendar() {
   };
 
   const handleDeleteConfirm = async () => {
-    await removeHoliday(deleteTarget.id);
-    setDeleteTarget(null);
+    const success = await removeHoliday(deleteTarget.id);
+    if (success) {
+      setDeleteTarget(null);
+    }
   };
 
   // ── Pagination numbers ────────────────────────
@@ -189,7 +192,6 @@ export default function HolidayCalendar() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Year filter */}
           <select
             value={selectedYear}
             onChange={(e) => { setSelectedYear(Number(e.target.value)); setCurrentPage(1); }}
@@ -200,7 +202,6 @@ export default function HolidayCalendar() {
             ))}
           </select>
 
-          {/* Add Holiday button */}
           <button
             onClick={handleAdd}
             className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
@@ -281,9 +282,9 @@ export default function HolidayCalendar() {
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
             {[
               { value: "all", label: "All" },
-              { value: "1",   label: "National" },
-              { value: "2",   label: "Optional" },
-              { value: "3",   label: "Company"  },
+              { value: "National Holiday", label: "National" },
+              { value: "Optional Holiday", label: "Optional" },
+              { value: "Company Holiday", label: "Company"  },
             ].map((f) => (
               <button
                 key={f.value}
@@ -531,7 +532,6 @@ export default function HolidayCalendar() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-
     </div>
   );
 }

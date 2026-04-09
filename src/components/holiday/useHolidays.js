@@ -10,6 +10,7 @@ import {
   createHoliday,
   updateHoliday,
   deleteHoliday,
+  normalizeHolidayType,
 } from "../../api/holidayApi";
 
 export function useHolidays(initialYear) {
@@ -32,7 +33,7 @@ export function useHolidays(initialYear) {
         id:           h.holidayId   || h.id           || h.holiday_id,
         holidayName:  h.holidayName || h.holiday_name || h.name,
         holidayDate:  h.holidayDate || h.holiday_date || h.date,
-        holidayType:  Number(h.holidayType || h.holiday_type || h.type),
+        holidayType:  normalizeHolidayType(h.holidayType || h.holiday_type || h.type),
         calendarYear: h.calendarYear || h.calendar_year || selectedYear,
       }));
 
@@ -102,12 +103,23 @@ export function useHolidays(initialYear) {
 
   // ── Delete ─────────────────────────────────────
   const removeHoliday = async (id) => {
+    setSubmitting(true);
+    setApiError("");
     try {
       await deleteHoliday(id);
       console.log("✅ Holiday deleted");
-      setHolidays((prev) => prev.filter((h) => h.id !== id));
+      await loadHolidays();
+      return true;
     } catch (err) {
       console.error("❌ Delete error:", err);
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.error   ||
+        "Failed to delete holiday. Please try again.";
+      setApiError(msg);
+      return false;
+    } finally {
+      setSubmitting(false);
     }
   };
 

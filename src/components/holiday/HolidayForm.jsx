@@ -80,7 +80,7 @@ export default function HolidayForm({
     onSubmit({
       holidayName:  form.holidayName.trim(),
       holidayDate:  form.holidayDate,
-      holidayType:  Number(form.holidayType),
+      holidayType:  form.holidayType,
       calendarYear: Number(form.calendarYear),
     });
   };

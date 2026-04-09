@@ -9,16 +9,52 @@
 
 import { useState, useEffect } from "react";
 import AttendancePolicyForm from "../components/attendance/AttendancePolicyForm";
+import { normalizeRole } from "../config/roles.jsx";
 import {
   createAttendancePolicy,
   fetchAttendancePolicy,
   fetchAttendancePolicyHistory,
+  updateAttendancePolicy,
 } from "../api/attendancePolicyApi";
 
+const Tooltip = ({ text, children }) => (
+  <div className="relative group">
+    {children}
+    <div className="absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity duration-150 pointer-events-none group-hover:opacity-100">
+      {text}
+      <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+    </div>
+  </div>
+);
+
 // ── Format 24hr time → 12hr display ──────────
+const normalizeTimeValue = (timeValue) => {
+  if (!timeValue) return "";
+  if (typeof timeValue === "string") return timeValue;
+  if (timeValue instanceof Date) return timeValue.toTimeString().slice(0, 8);
+  if (typeof timeValue === "object") {
+    if (typeof timeValue.toString === "function") {
+      const stringValue = timeValue.toString();
+      if (stringValue && stringValue !== "[object Object]") return stringValue;
+    }
+
+    const hour = timeValue.hour ?? timeValue.hours;
+    const minute = timeValue.minute ?? timeValue.minutes ?? 0;
+    const second = timeValue.second ?? timeValue.seconds ?? 0;
+
+    if (hour !== undefined) {
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
+    }
+  }
+
+  return String(timeValue);
+};
+
 const formatTime = (time24) => {
-  if (!time24) return "—";
-  const [h, m] = time24.split(":").map(Number);
+  const normalized = normalizeTimeValue(time24);
+  if (!normalized) return "—";
+  const [h, m] = normalized.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return normalized;
   const ampm  = h >= 12 ? "PM" : "AM";
   const hour  = h % 12 || 12;
   return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
@@ -27,7 +63,11 @@ const formatTime = (time24) => {
 // ── Format date string ────────────────────────
 const formatDate = (dateStr) => {
   if (!dateStr) return "—";
-  const d = new Date(dateStr + "T00:00:00");
+  const normalized = typeof dateStr === "string" && dateStr.includes("T")
+    ? dateStr
+    : `${dateStr}T00:00:00`;
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-GB", {
     day: "2-digit", month: "short", year: "numeric",
   });
@@ -78,24 +118,79 @@ const TH = ({ icon, label }) => (
 
 export default function AttendancePolicy() {
   // ── RBAC ──────────────────────────────────────
-  const role    = localStorage.getItem("role") || "";
+  const role    = normalizeRole(localStorage.getItem("role"));
   const isAdmin = role === "admin";
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "{}");
+    } catch {
+      return {};
+    }
+  })();
 
   // ── State ─────────────────────────────────────
   const [policy, setPolicy]     = useState(null);
   const [history, setHistory]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
+
+  const toInputTime = (timeValue) => {
+    const normalized = normalizeTimeValue(timeValue);
+    return normalized ? normalized.slice(0, 5) : "";
+  };
+
+  const currentUserLabel = (() => {
+    const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(" ").trim();
+    return fullName || currentUser.email || localStorage.getItem("role") || "Current Admin";
+  })();
+
+  const isUuidLike = (value) =>
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+
+  const resolveUpdatedBy = (...values) => {
+    const resolved = values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+    if (!resolved) return currentUserLabel;
+    return isUuidLike(resolved) ? currentUserLabel : resolved;
+  };
+
+  const hasPolicyValues = (item) => {
+    if (!item) return false;
+
+    return Boolean(
+      item.minInTime ||
+      item.min_in_time ||
+      item.minOutTime ||
+      item.min_out_time ||
+      item.minWorkingHour ||
+      item.min_working_hour ||
+      item.halfDayHour ||
+      item.half_day_hour
+    );
+  };
+
+  const getPolicyRecords = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.content)) return payload.content;
+    if (Array.isArray(payload?.rows)) return payload.rows;
+    return payload ? [payload] : [];
+  };
+
+  const getPolicyRecord = (payload) => {
+    const records = getPolicyRecords(payload);
+    return [...records].reverse().find(hasPolicyValues) || records[records.length - 1] || null;
+  };
 
   const normalizePolicy = (item) => {
     if (!item) return null;
 
     return {
-      id: item.id || item.policyId || item.uuid || "",
-      minInTime: item.minInTime || item.min_in_time || "",
-      minOutTime: item.minOutTime || item.min_out_time || "",
+      id: item.id || item.policyId || item.attPolicyId || item.uuid || "",
+      minInTime: normalizeTimeValue(item.minInTime || item.min_in_time),
+      minOutTime: normalizeTimeValue(item.minOutTime || item.min_out_time),
       minWorkingHour:
         item.minWorkingHour ??
         item.min_working_hour ??
@@ -107,16 +202,66 @@ export default function AttendancePolicy() {
         item.halfDayHours ??
         "",
       updatedBy:
-        item.updatedBy ||
-        item.updated_by ||
-        item.createdBy ||
-        item.created_by ||
-        "",
+        resolveUpdatedBy(
+          item.updatedBy,
+          item.updated_by,
+          item.createdBy,
+          item.created_by
+        ),
       updatedOn:
         item.updatedOn ||
         item.updated_on ||
         item.createdOn ||
         item.created_on ||
+        "",
+    };
+  };
+
+  const toHistoryRow = (item) => {
+    const normalized = normalizePolicy(item);
+    if (!normalized) return null;
+
+    return {
+      id: normalized.id || `policy-${Date.now()}`,
+      date: (normalized.updatedOn || new Date().toISOString()).slice(0, 10),
+      updatedBy: normalized.updatedBy || "—",
+      minInTime: normalized.minInTime,
+      minOutTime: normalized.minOutTime,
+      workingHours: normalized.minWorkingHour,
+      halfDayHours: normalized.halfDayHour,
+    };
+  };
+
+  const normalizeHistoryRow = (item) => {
+    if (!item) return null;
+
+    return {
+      id: item.id || item.policyId || item.attPolicyId || item.uuid || `history-${Date.now()}`,
+      date:
+        item.date ||
+        item.updatedOn ||
+        item.updated_on ||
+        item.createdOn ||
+        item.created_on ||
+        "",
+      updatedBy:
+        resolveUpdatedBy(
+          item.updatedBy,
+          item.updated_by,
+          item.createdBy,
+          item.created_by
+        ),
+      minInTime: normalizeTimeValue(item.minInTime || item.min_in_time),
+      minOutTime: normalizeTimeValue(item.minOutTime || item.min_out_time),
+      workingHours:
+        item.workingHours ??
+        item.minWorkingHour ??
+        item.min_working_hour ??
+        "",
+      halfDayHours:
+        item.halfDayHours ??
+        item.halfDayHour ??
+        item.half_day_hour ??
         "",
     };
   };
@@ -133,10 +278,21 @@ export default function AttendancePolicy() {
         fetchAttendancePolicy(),
         fetchAttendancePolicyHistory(),
       ]);
+      const liveRows = getPolicyRecords(policyData)
+        .filter(hasPolicyValues)
+        .reverse()
+        .map(normalizeHistoryRow)
+        .filter(Boolean);
+      const currentPolicy = normalizePolicy(getPolicyRecord(policyData));
+      const normalizedHistory = (Array.isArray(historyData) ? historyData : [])
+        .map(normalizeHistoryRow)
+        .filter(Boolean);
+      const mergedHistory = liveRows.length > 0 ? liveRows : normalizedHistory;
+
       console.log("✅ Policy:", policyData);
       console.log("✅ History:", historyData);
-      setPolicy(normalizePolicy(policyData));
-      setHistory(historyData);
+      setPolicy(currentPolicy);
+      setHistory(mergedHistory);
     } catch (err) {
       console.error("❌ Failed to load attendance policy:", err);
     } finally {
@@ -149,38 +305,15 @@ export default function AttendancePolicy() {
     setSubmitting(true);
     setApiError("");
     try {
-      const response = await createAttendancePolicy(formData);
-      const savedPolicy = normalizePolicy(response?.data || response);
-
-      setPolicy(
-        savedPolicy || {
-          id: policy?.id || "",
-          minInTime: formData.min_in_time,
-          minOutTime: formData.min_out_time,
-          minWorkingHour: Number(formData.min_working_hour),
-          halfDayHour: Number(formData.half_day_hour),
-          updatedBy: "",
-          updatedOn: new Date().toISOString(),
-        }
-      );
-
-      if (savedPolicy) {
-        setHistory((prev) => [
-          {
-            id: savedPolicy.id || `policy-${Date.now()}`,
-            date: (savedPolicy.updatedOn || new Date().toISOString()).slice(0, 10),
-            updatedBy: savedPolicy.updatedBy || "—",
-            minInTime: savedPolicy.minInTime,
-            minOutTime: savedPolicy.minOutTime,
-            workingHours: savedPolicy.minWorkingHour,
-            halfDayHours: savedPolicy.halfDayHour,
-          },
-          ...prev,
-        ]);
+      if (editTarget) {
+        await updateAttendancePolicy(formData);
+      } else {
+        await createAttendancePolicy(formData);
       }
-
-      console.log("✅ Policy created");
+      await loadAll();
+      console.log(editTarget ? "✅ Policy updated" : "✅ Policy created");
       setShowForm(false);
+      setEditTarget(null);
     } catch (err) {
       console.error("❌ Save error:", err);
       const msg =
@@ -191,6 +324,45 @@ export default function AttendancePolicy() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDeleteRow = (rowId) => {
+    setHistory((prev) => {
+      const next = prev.filter((row) => row.id !== rowId);
+
+      if (policy?.id === rowId) {
+        const nextLatest = next[0] || null;
+        setPolicy(
+          nextLatest
+            ? {
+                id: nextLatest.id,
+                minInTime: nextLatest.minInTime,
+                minOutTime: nextLatest.minOutTime,
+                minWorkingHour: nextLatest.workingHours,
+                halfDayHour: nextLatest.halfDayHours,
+                updatedBy: nextLatest.updatedBy,
+                updatedOn: nextLatest.date,
+              }
+            : null
+        );
+      }
+
+      return next;
+    });
+  };
+
+  const handleEditRow = (row) => {
+    setApiError("");
+    setEditTarget({
+      id: row.id,
+      minInTime: row.minInTime,
+      minOutTime: row.minOutTime,
+      minWorkingHour: row.workingHours,
+      halfDayHour: row.halfDayHours,
+      updatedBy: row.updatedBy,
+      updatedOn: row.date,
+    });
+    setShowForm(true);
   };
 
   // ── Loading skeleton ──────────────────────────
@@ -238,16 +410,22 @@ export default function AttendancePolicy() {
             </p>
           </div>
 
-          {/* Edit Policy button — admin only */}
+          {/* Add/Edit Policy button — admin only */}
           {isAdmin && (
             <button
               onClick={() => { setApiError(""); setShowForm(true); }}
               className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
+              {policy ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              )}
               {policy ? "Edit Policy" : "Add Policy"}
             </button>
           )}
@@ -288,10 +466,10 @@ export default function AttendancePolicy() {
                 <p className="text-sm">No policy configured yet.</p>
                 {isAdmin && (
                   <button
-                    onClick={() => setShowForm(true)}
+                    onClick={() => { setApiError(""); setShowForm(true); }}
                     className="mt-2 text-xs font-semibold text-[#1a2240] hover:underline"
                   >
-                    + Set up policy
+                    + Add policy
                   </button>
                 )}
               </div>
@@ -317,10 +495,20 @@ export default function AttendancePolicy() {
         {/* ── Policy History section ── */}
         <div>
           <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Policy Change History</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Track updates made to attendance rules over time
-            </p>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Policy Records</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Showing all attendance policy entries returned by the API
+                </p>
+              </div>
+              {history.length > 0 && (
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                  {history.length} records
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -336,6 +524,7 @@ export default function AttendancePolicy() {
                     <TH icon={<ClockIcon />} label="Min Out Time" />
                     <TH icon={<CalIcon />}  label="Working Hours" />
                     <TH icon={<CalIcon />}  label="Half Day Hours" />
+                    {isAdmin && <TH icon={<UserIcon />} label="Actions" />}
                   </tr>
                 </thead>
 
@@ -343,7 +532,7 @@ export default function AttendancePolicy() {
                 <tbody className="divide-y divide-gray-50">
                   {history.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-16 text-center">
+                      <td colSpan={isAdmin ? 7 : 6} className="px-6 py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -418,6 +607,36 @@ export default function AttendancePolicy() {
                             </span>
                           </td>
 
+                          {isAdmin && (
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-1">
+                                <Tooltip text="Edit">
+                                  <button
+                                    onClick={() => handleEditRow(row)}
+                                    className="rounded-lg p-1.5 text-gray-400 transition-all duration-150 hover:bg-amber-50 hover:text-amber-600"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                  </button>
+                                </Tooltip>
+
+                                <Tooltip text="Delete">
+                                  <button
+                                    onClick={() => handleDeleteRow(row.id)}
+                                    className="rounded-lg p-1.5 text-gray-400 transition-all duration-150 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </Tooltip>
+                              </div>
+                            </td>
+                          )}
+
                         </tr>
                       );
                     })
@@ -433,13 +652,18 @@ export default function AttendancePolicy() {
       {/* ── Edit Modal ── */}
       {showForm && (
         <AttendancePolicyForm
-          initial={policy}
+          initial={(editTarget || policy) ? {
+            ...(editTarget || policy),
+            minInTime: toInputTime((editTarget || policy).minInTime),
+            minOutTime: toInputTime((editTarget || policy).minOutTime),
+          } : null}
           submitting={submitting}
           apiError={apiError}
           onSubmit={handleFormSubmit}
           onClose={() => {
             if (!submitting) {
               setShowForm(false);
+              setEditTarget(null);
               setApiError("");
             }
           }}
