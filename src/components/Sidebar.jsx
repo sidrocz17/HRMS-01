@@ -23,7 +23,7 @@ const ROUTE_MAP = {
   "Payroll":                "/payroll",
 
   // Employee Management
-  "Employee Onboarding":    "/employees",
+  "Employee Onboarding": "/employee-onboarding",
   "Employee Offboarding":   "/employees",
   "Resignation Requests":   "/employees",
 

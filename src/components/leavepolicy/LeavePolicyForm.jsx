@@ -173,7 +173,7 @@ export default function LeavePolicyForm({
               <option value="">Select leave type...</option>
               {leaveTypes.map((lt) => (
                 <option key={lt.id} value={lt.id}>
-                  {lt.label || lt.name || lt.title || lt.type || lt.leaveType}
+                  {lt.label || lt.name || lt.title || lt.type || lt.typeName || lt.leaveType}
                 </option>
               ))}
             </select>
@@ -194,7 +194,7 @@ export default function LeavePolicyForm({
               <option value="">Select employee type...</option>
               {employeeTypes.map((et) => (
                 <option key={et.id} value={et.id}>
-                  {et.label || et.name || et.title || et.type || et.employeeType}
+                  {et.label || et.name || et.title || et.type || et.typeName || et.employeeType || et.employee_type}
                 </option>
               ))}
             </select>

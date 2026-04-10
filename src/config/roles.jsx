@@ -111,6 +111,7 @@ export const MENU_CONFIG = {
       label: "Admin",
       icon: Icons.admin,
       children: [
+        "Employee Onboarding",
         "Department",
         "Designation",
         "Employee Types",

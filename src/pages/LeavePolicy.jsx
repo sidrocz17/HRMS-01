@@ -47,27 +47,81 @@ const toArray = (value) => {
   return [];
 };
 
+const normalizeLabelValue = (value) => {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (value && typeof value === "object") {
+    return (
+      value.label ||
+      value.name ||
+      value.title ||
+      value.type ||
+      value.typeName ||
+      value.employeeType ||
+      value.employee_type ||
+      value.employmentType ||
+      value.employment_type_name ||
+      value.employmentTypeName ||
+      value.leaveType ||
+      value.leave_type ||
+      ""
+    );
+  }
+
+  return "";
+};
+
 const mapOption = (item = {}, idKeys = [], labelKeys = []) => ({
   id: idKeys.map((key) => item?.[key]).find(Boolean) || "",
-  label: labelKeys.map((key) => item?.[key]).find(Boolean) || "",
+  label: labelKeys.map((key) => normalizeLabelValue(item?.[key])).find(Boolean) || "",
 });
 
 const mapLeaveTypeOption = (item) =>
-  mapOption(item, ["id", "typeId", "type_id"], ["name", "title", "type", "leaveType"]);
+  mapOption(item, ["id", "typeId", "type_id"], ["name", "title", "type", "typeName", "leaveType"]);
 
 const mapEmployeeTypeOption = (item) =>
-  mapOption(item, ["id", "employeeTypeId", "employee_type_id"], ["name", "title", "type", "employeeType"]);
+  mapOption(
+    item,
+    ["id", "employeeTypeId", "employee_type_id", "employmentTypeId", "employment_type_id"],
+    ["name", "title", "type", "typeName", "employeeType", "employee_type", "employmentType", "employment_type_name", "employmentTypeName"]
+  );
 
 const mapPolicyItem = (d = {}) => ({
   id: d.policyId || d.id || d.policy_id || uuidv4(),
   type_id: d.typeId || d.type_id || "",
-  employee_type_id: d.employeeTypeId || d.employee_type_id || "",
+  employee_type_id:
+    d.employeeTypeId ||
+    d.employee_type_id ||
+    d.employmentTypeId ||
+    d.employment_type_id ||
+    "",
   no_of_days: d.noOfDays ?? d.no_of_days ?? 0,
   start_date: d.startDate || d.start_date || "",
   end_date: d.endDate || d.end_date || "",
   financial_year: getFYLabel(d.startDate || d.start_date),
-  leave_type_label: d.leaveTypeName || d.name || d.title || d.type || "",
-  employee_type_label: d.employeeTypeName || d.employeeType || d.name || d.title || "",
+  leave_type_label:
+    normalizeLabelValue(d.leaveTypeName) ||
+    normalizeLabelValue(d.leave_type_name) ||
+    normalizeLabelValue(d.leaveType) ||
+    normalizeLabelValue(d.typeName) ||
+    normalizeLabelValue(d.name) ||
+    normalizeLabelValue(d.title) ||
+    normalizeLabelValue(d.type) ||
+    "",
+  employee_type_label:
+    normalizeLabelValue(d.employeeTypeName) ||
+    normalizeLabelValue(d.employee_type_name) ||
+    normalizeLabelValue(d.employeeType) ||
+    normalizeLabelValue(d.employmentTypeName) ||
+    normalizeLabelValue(d.employment_type_name) ||
+    normalizeLabelValue(d.employmentType) ||
+    normalizeLabelValue(d.typeName) ||
+    normalizeLabelValue(d.name) ||
+    normalizeLabelValue(d.title) ||
+    normalizeLabelValue(d.type) ||
+    "",
 });
 
 const decodeJwtPayload = (token) => {
@@ -240,7 +294,9 @@ export default function LeavePolicy() {
 
   // ── Helper: resolve labels from IDs ──────────
   const resolveLabel = (id, list) =>
-    list.find((i) => String(i.id) === String(id))?.label || id || "—";
+    normalizeLabelValue(list.find((i) => String(i.id) === String(id))?.label) ||
+    normalizeLabelValue(id) ||
+    "—";
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
