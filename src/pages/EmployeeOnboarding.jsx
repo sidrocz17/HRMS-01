@@ -1,9 +1,11 @@
 // src/pages/EmployeeOnboarding.jsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { createEmployee } from "../api/employeeApi";
+import { getEmployeeById, updateEmployee } from "../api/employeeManagementApi";
 import { fetchDepartments } from "../api/departmentApi";
 import { fetchDesignations } from "../api/designationApi";
+import { fetchLeaveTypes } from "../api/leaveTypeApi";
 import Stepper from "../components/employee_OB/onboarding/Stepper";
 import BasicInfoStep from "../components/employee_OB/onboarding/BasicInfoStep";
 import JobDetailsStep from "../components/employee_OB/onboarding/JobDetailsStep";
@@ -11,6 +13,8 @@ import IdentityStep from "../components/employee_OB/onboarding/IdentityStep";
 import PreviousEmploymentStep from "../components/employee_OB/onboarding/PreviousEmploymentStep";
 import DocumentUploadStep from "../components/employee_OB/onboarding/DocumentUploadStep";
 import ReviewStep from "../components/employee_OB/onboarding/ReviewStep";
+import SuccessModal from "../components/modals/SuccessModal";
+import AssignLeaveModal from "../components/modals/AssignLeaveModal";
 
 const STEPS = [
   { number: 1, label: "Basic Info" },
@@ -150,6 +154,107 @@ const mapDesignationOption = (item = {}) => ({
   title: item.title || item.designationName || item.name || "",
 });
 
+const mapLeaveTypeOption = (item = {}) => ({
+  id: item.id || item.leaveTypeId || item.typeId || item.type_id || item.uuid || "",
+  name: item.name || item.type || item.title || item.leaveType || item.typeName || "",
+});
+
+const toInputDate = (value) => {
+  if (!value) return "";
+  const asString = String(value);
+  return asString.length >= 10 ? asString.slice(0, 10) : asString;
+};
+
+const firstFilledValue = (...values) =>
+  values.find((value) => value !== undefined && value !== null && value !== "") ?? "";
+
+const mapEmployeeToFormData = (employee = {}) => {
+  const department = employee.department || employee.department_details || {};
+  const designation = employee.designation || employee.designation_details || {};
+
+  const mapped = {
+    basicInfo: {
+      first_name: firstFilledValue(
+        employee.first_name,
+        employee.firstName,
+        employee.firstname
+      ),
+      last_name: firstFilledValue(
+        employee.last_name,
+        employee.lastName,
+        employee.lastname
+      ),
+      email: firstFilledValue(
+        employee.email,
+        employee.email_id,
+        employee.work_email
+      ),
+      phone: firstFilledValue(
+        employee.phone,
+        employee.phone_num,
+        employee.mobile,
+        employee.mobile_num
+      ),
+      address: firstFilledValue(employee.address, employee.current_address),
+    },
+    jobDetails: {
+      dept_id: firstFilledValue(
+        employee.dept_id,
+        employee.department_id,
+        employee.departmentId,
+        department.id,
+        department.dept_id,
+        department.department_id
+      ),
+      desig_id: firstFilledValue(
+        employee.desig_id,
+        employee.designation_id,
+        employee.designationId,
+        designation.id,
+        designation.desig_id,
+        designation.designation_id
+      ),
+      reporting_manager: firstFilledValue(
+        employee.reporting_manager,
+        employee.reportingManager,
+        employee.manager_id
+      ),
+      join_date: toInputDate(
+        firstFilledValue(
+          employee.join_date,
+          employee.joinDate,
+          employee.joining_date,
+          employee.date_of_joining
+        )
+      ),
+      offer_letter_num: firstFilledValue(
+        employee.offer_letter_num,
+        employee.offerLetterNum
+      ),
+      notice_period: firstFilledValue(
+        employee.notice_period,
+        employee.noticePeriod
+      ),
+    },
+    identity: {
+      pan_num: firstFilledValue(employee.pan_num, employee.panNum),
+      aadhar_num: firstFilledValue(
+        employee.aadhar_num,
+        employee.aadharNum,
+        employee.aadhaar_num,
+        employee.aadhaarNum
+      ),
+      passport_num: firstFilledValue(employee.passport_num, employee.passportNum),
+    },
+    previousEmployment: Array.isArray(employee.previousEmployment)
+      ? employee.previousEmployment
+      : INITIAL_FORM_DATA.previousEmployment,
+    documents: INITIAL_FORM_DATA.documents,
+  };
+
+  return mapped;
+};
+
 export default function EmployeeOnboarding() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
@@ -158,8 +263,18 @@ export default function EmployeeOnboarding() {
   const [apiError, setApiError] = useState("");
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
+  const [employeeCredentials, setEmployeeCredentials] = useState(null);
+  const [newEmployeeId, setNewEmployeeId] = useState(null);
+  const [leaveTypes, setLeaveTypes] = useState([]);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get("mode");
+  const employeeId = searchParams.get("id");
+  const isEditMode = mode === "edit";
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -187,6 +302,39 @@ export default function EmployeeOnboarding() {
 
     loadOptions();
   }, []);
+
+  useEffect(() => {
+    const routeEmployee = location.state?.employee;
+
+    const hydrateEditData = async () => {
+      if (!isEditMode) {
+        setFormData(INITIAL_FORM_DATA);
+        return;
+      }
+
+      try {
+        if (routeEmployee) {
+          setFormData(mapEmployeeToFormData(routeEmployee));
+          return;
+        }
+
+        if (employeeId) {
+          const response = await getEmployeeById(employeeId);
+          const employeeData = response?.data || response || {};
+          setFormData(mapEmployeeToFormData(employeeData));
+        }
+      } catch (error) {
+        console.error("❌ Failed to load employee for edit:", error);
+        setApiError(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Failed to load employee details"
+        );
+      }
+    };
+
+    hydrateEditData();
+  }, [isEditMode, employeeId, location.state]);
 
   const handleFieldChange = (section, field, value) => {
     setFormData((prev) => ({
@@ -244,6 +392,33 @@ export default function EmployeeOnboarding() {
         [field]: file,
       },
     }));
+  };
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false);
+    setShowAssignLeaveModal(false);
+    setEmployeeCredentials(null);
+    setNewEmployeeId(null);
+    setLeaveTypes([]);
+    setFormData(INITIAL_FORM_DATA);
+    setStep(1);
+    navigate("/employee-management");
+  };
+
+  const handleOpenAssignLeave = () => {
+    setShowSuccessModal(false);
+    setShowAssignLeaveModal(true);
+  };
+
+  const handleAssignLeave = async (leaveData) => {
+    try {
+      console.log("✅ Leave assigned:", leaveData);
+      setShowAssignLeaveModal(false);
+      setFormData(INITIAL_FORM_DATA);
+      setStep(1);
+      navigate("/employee-management");
+    } catch (error) {
+      console.error("❌ Error:", error);
+    }
   };
 
   const validateStep = (stepNum) => {
@@ -334,13 +509,46 @@ export default function EmployeeOnboarding() {
     try {
       const userId = getStoredUserId();
       const payload = transformPayload(formData, userId);
+      const response =
+        isEditMode && employeeId
+          ? await updateEmployee(employeeId, payload)
+          : await createEmployee(payload);
+      const employeeResponse = response?.data || response || {};
 
-      await createEmployee(payload);
-      console.log("📤 Employee data:", payload);
-      alert("Employee onboarded successfully!");
-      setFormData(INITIAL_FORM_DATA);
-      setStep(1);
-      navigate("/dashboard");
+      if (isEditMode) {
+        navigate("/employee-management");
+        return;
+      }
+
+      const ltResponse = await fetchLeaveTypes();
+
+      setEmployeeCredentials({
+        message: employeeResponse.message || "Employee added successfully",
+        userId:
+          employeeResponse.username ||
+          employeeResponse.userId ||
+          employeeResponse.emp_id ||
+          employeeResponse.employeeId ||
+          employeeResponse.id ||
+          "-",
+        password:
+          employeeResponse.temporaryPassword ||
+          employeeResponse.password ||
+          "-",
+      });
+      setNewEmployeeId(
+        employeeResponse.emp_id ||
+          employeeResponse.employeeId ||
+          employeeResponse.id ||
+          employeeResponse.userId ||
+          null
+      );
+      setLeaveTypes(
+        toArray(ltResponse?.data || ltResponse)
+          .map(mapLeaveTypeOption)
+          .filter((item) => item.id && item.name)
+      );
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("❌ Error:", error);
       setApiError(
@@ -381,7 +589,9 @@ export default function EmployeeOnboarding() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Employee Onboarding</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Complete the onboarding process step by step
+          {isEditMode
+            ? "Update employee details"
+            : "Complete the onboarding process step by step"}
         </p>
       </div>
 
@@ -535,13 +745,28 @@ export default function EmployeeOnboarding() {
                     Submitting...
                   </span>
                 ) : (
-                  "Submit"
+                  isEditMode ? "Update" : "Submit"
                 )}
               </button>
             )}
           </div>
         </div>
       </div>
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={handleSuccessModalClose}
+        credentials={employeeCredentials}
+        onAssignLeave={handleOpenAssignLeave}
+      />
+
+      <AssignLeaveModal
+        isOpen={showAssignLeaveModal}
+        onClose={() => setShowAssignLeaveModal(false)}
+        employeeId={newEmployeeId}
+        leaveTypes={leaveTypes}
+        onSubmit={handleAssignLeave}
+      />
     </div>
   );
 }

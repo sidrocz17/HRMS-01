@@ -132,9 +132,10 @@ export default function EmployeeManagement() {
   }, []);
 
   const handleEdit = (employee) => {
-    // TODO: Navigate to edit page or open edit modal
     console.log("✏️ Edit employee:", employee);
-    navigate(`/employee-onboarding?mode=edit&id=${employee.emp_id}`);
+    navigate(`/employee-onboarding?mode=edit&id=${employee.emp_id}`, {
+      state: { employee },
+    });
   };
 
   const handleDeactivate = (employee) => {

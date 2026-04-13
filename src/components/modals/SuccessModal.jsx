@@ -38,7 +38,7 @@ export default function SuccessModal({
             </div>
           </div>
           <h2 className="text-xl font-bold text-center text-gray-900">
-            Employee Added Successfully
+            {credentials?.message || "Employee Added Successfully"}
           </h2>
         </div>
 
@@ -52,10 +52,10 @@ export default function SuccessModal({
             </p>
           </div>
 
-          {/* User ID */}
+          {/* Login ID */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              User ID
+              Login ID
             </label>
             <div className="flex items-center gap-2">
               <div className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-sm text-gray-900 select-all">
