@@ -13,7 +13,7 @@ const authHeaders = () => ({
 export const createEmployee = async (formData) => {
   try {
     const response = await axios.post(
-      `${BASE_URL}/employees`,
+      `${BASE_URL}/employees/onboarding`,
       JSON.stringify(formData),
       authHeaders()
     );

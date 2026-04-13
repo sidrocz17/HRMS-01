@@ -26,6 +26,7 @@ const ROUTE_MAP = {
   "Employee Onboarding": "/employee-onboarding",
   "Employee Offboarding":   "/employees",
   "Resignation Requests":   "/employees",
+  "Employee Management": "/employee-management",
 
   // Onboarding & Offboarding (HR label)
   "Onboarding & Offboarding": "/employees",

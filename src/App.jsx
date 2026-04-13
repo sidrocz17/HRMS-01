@@ -14,6 +14,8 @@ import HolidayCalendar from "./pages/HolidayCalendar";
 import AttendancePolicy from "./pages/AttendancePolicy";
 import LeaveManagement from "./pages/LeaveManagement";
 import EmployeeOnboarding from "./pages/EmployeeOnboarding";
+import EmployeeManagement from "./pages/EmployeeManagement";
+
 
 function DashboardLayout({ page }) {
   const pages = {
@@ -27,6 +29,7 @@ function DashboardLayout({ page }) {
     "attendance-settings": <AttendancePolicy />,
     "leave-management": <LeaveManagement />,
     "employee-onboarding": <EmployeeOnboarding />,
+    "employee-management": <EmployeeManagement />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -130,8 +133,16 @@ export default function App() {
         <Route
           path="/employee-onboarding"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
               <DashboardLayout page="employee-onboarding" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-management"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+              <DashboardLayout page="employee-management" />
             </ProtectedRoute>
           }
         />
