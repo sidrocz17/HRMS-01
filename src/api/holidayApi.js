@@ -93,7 +93,7 @@ export const updateHoliday = async (id, payload) => {
 // Response: { message: "Holiday deleted successfully" }
 export const deleteHoliday = async (id) => {
   const response = await axios.delete(
-    `${BASE_URL}/holiday/${id}`,
+    `${BASE_URL}/holiday/${id}/deactivate`,
     authHeaders()
   );
   return response.data;

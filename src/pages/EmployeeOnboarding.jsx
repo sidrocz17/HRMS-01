@@ -5,7 +5,8 @@ import { createEmployee } from "../api/employeeApi";
 import { getEmployeeById, updateEmployee } from "../api/employeeManagementApi";
 import { fetchDepartments } from "../api/departmentApi";
 import { fetchDesignations } from "../api/designationApi";
-import { fetchLeaveTypes } from "../api/leaveTypeApi";
+import { allocateEmployeeLeaves } from "../api/leaveApi";
+import { fetchLeaveTypes as fetchLeaveTypesForAssign } from "../api/leaveTypeApi";
 import Stepper from "../components/employee_OB/onboarding/Stepper";
 import BasicInfoStep from "../components/employee_OB/onboarding/BasicInfoStep";
 import JobDetailsStep from "../components/employee_OB/onboarding/JobDetailsStep";
@@ -154,11 +155,6 @@ const mapDesignationOption = (item = {}) => ({
   title: item.title || item.designationName || item.name || "",
 });
 
-const mapLeaveTypeOption = (item = {}) => ({
-  id: item.id || item.leaveTypeId || item.typeId || item.type_id || item.uuid || "",
-  name: item.name || item.type || item.title || item.leaveType || item.typeName || "",
-});
-
 const toInputDate = (value) => {
   if (!value) return "";
   const asString = String(value);
@@ -167,6 +163,30 @@ const toInputDate = (value) => {
 
 const firstFilledValue = (...values) =>
   values.find((value) => value !== undefined && value !== null && value !== "") ?? "";
+
+const asObject = (value) =>
+  value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+const getResponseSources = (response) => {
+  const root = asObject(response);
+  const data = asObject(root.data);
+
+  return [
+    root,
+    data,
+    asObject(root.result),
+    asObject(root.payload),
+    asObject(root.employee),
+    asObject(data.result),
+    asObject(data.payload),
+    asObject(data.employee),
+  ];
+};
+
+const isUuid = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || "").trim()
+  );
 
 const mapEmployeeToFormData = (employee = {}) => {
   const department = employee.department || employee.department_details || {};
@@ -264,10 +284,14 @@ export default function EmployeeOnboarding() {
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
   const [employeeCredentials, setEmployeeCredentials] = useState(null);
-  const [newEmployeeId, setNewEmployeeId] = useState(null);
-  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [createdEmployeeId, setCreatedEmployeeId] = useState(null);
+  const [leaveAllocationResult, setLeaveAllocationResult] = useState([]);
+  const [leaveAllocationMessage, setLeaveAllocationMessage] = useState("");
+  const [leaveAllocationError, setLeaveAllocationError] = useState("");
+  const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
+  const [assignLeaveTypes, setAssignLeaveTypes] = useState([]);
+  const [assignLeaveTypesLoading, setAssignLeaveTypesLoading] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -395,29 +419,78 @@ export default function EmployeeOnboarding() {
   };
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
-    setShowAssignLeaveModal(false);
     setEmployeeCredentials(null);
-    setNewEmployeeId(null);
-    setLeaveTypes([]);
+    setCreatedEmployeeId(null);
+    setLeaveAllocationResult([]);
+    setLeaveAllocationMessage("");
+    setLeaveAllocationError("");
+    setShowAssignLeaveModal(false);
     setFormData(INITIAL_FORM_DATA);
     setStep(1);
     navigate("/employee-management");
   };
 
-  const handleOpenAssignLeave = () => {
-    setShowSuccessModal(false);
+  const ensureAssignLeaveTypesLoaded = async () => {
+    if (assignLeaveTypesLoading) return { types: null, error: null };
+    if (assignLeaveTypes.length > 0)
+      return { types: assignLeaveTypes, error: null };
+
+    setAssignLeaveTypesLoading(true);
+    try {
+      const response = await fetchLeaveTypesForAssign();
+      const rawTypes = Array.isArray(response?.data) ? response.data : response;
+      const normalized = (Array.isArray(rawTypes) ? rawTypes : [])
+        .map((t) => ({
+          id: t.typeId ?? t.id ?? t.type_id,
+          name: t.type ?? t.leaveType ?? t.name ?? t.label ?? "",
+        }))
+        .filter((t) => t.id && t.name);
+
+      setAssignLeaveTypes(normalized);
+      return { types: normalized, error: null };
+    } catch (error) {
+      console.error("❌ Failed to load leave types:", error);
+      const message =
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to load leave types";
+      return { types: null, error: message };
+    } finally {
+      setAssignLeaveTypesLoading(false);
+    }
+  };
+
+  const handleAddLeaveClick = async () => {
+    const { types, error } = await ensureAssignLeaveTypesLoaded();
+    if (!types || types.length === 0) {
+      setLeaveAllocationError(error || "No leave types available to assign");
+      return;
+    }
     setShowAssignLeaveModal(true);
   };
 
-  const handleAssignLeave = async (leaveData) => {
+  const handleAssignLeave = async ({ employeeId, leaveTypeId, totalLeaves }) => {
+    setLeaveAllocationError("");
     try {
-      console.log("✅ Leave assigned:", leaveData);
+      const payload = { leaveTypeId, totalLeaves };
+      const response = await allocateEmployeeLeaves(employeeId, payload);
+      const message =
+        response?.message || "Leave allocated successfully";
+      const data = Array.isArray(response?.data) ? response.data : [];
+
+      setLeaveAllocationMessage(message);
+      setLeaveAllocationResult(data);
       setShowAssignLeaveModal(false);
-      setFormData(INITIAL_FORM_DATA);
-      setStep(1);
-      navigate("/employee-management");
     } catch (error) {
-      console.error("❌ Error:", error);
+      console.error("❌ Assign leave failed:", error);
+      setLeaveAllocationError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to assign leave"
+      );
+      throw error;
     }
   };
 
@@ -513,40 +586,72 @@ export default function EmployeeOnboarding() {
         isEditMode && employeeId
           ? await updateEmployee(employeeId, payload)
           : await createEmployee(payload);
-      const employeeResponse = response?.data || response || {};
+      const responseSources = getResponseSources(response);
+      const employeeMessage = firstFilledValue(
+        ...responseSources.map((item) => item.message),
+        "Employee added successfully"
+      );
+      const extractedUserId = firstFilledValue(
+        ...responseSources.flatMap((item) => [
+          item.username,
+          item.userId,
+          item.user_id,
+          item.loginId,
+          item.login_id,
+          item.emp_id,
+          item.empId,
+          item.employeeId,
+          item.employee_id,
+          item.id,
+        ]),
+        "-"
+      );
+      const extractedPassword = firstFilledValue(
+        ...responseSources.flatMap((item) => [
+          item.temporaryPassword,
+          item.temporary_password,
+          item.password,
+          item.tempPassword,
+        ]),
+        "-"
+      );
 
       if (isEditMode) {
         navigate("/employee-management");
         return;
       }
 
-      const ltResponse = await fetchLeaveTypes();
+      const empIdCandidates = responseSources.flatMap((item) => [
+        item.emp_uuid,
+        item.empUuid,
+        item.employee_uuid,
+        item.employeeUuid,
+        item.uuid,
+        item.emp_id,
+        item.empId,
+        item.employeeId,
+        item.employee_id,
+        item.id,
+      ]);
+      const newEmpId =
+        empIdCandidates.find((value) => isUuid(value)) ||
+        empIdCandidates.find((value) => value !== undefined && value !== null && String(value).trim() !== "") ||
+        null;
 
       setEmployeeCredentials({
-        message: employeeResponse.message || "Employee added successfully",
-        userId:
-          employeeResponse.username ||
-          employeeResponse.userId ||
-          employeeResponse.emp_id ||
-          employeeResponse.employeeId ||
-          employeeResponse.id ||
-          "-",
-        password:
-          employeeResponse.temporaryPassword ||
-          employeeResponse.password ||
-          "-",
+        message: employeeMessage,
+        userId: extractedUserId,
+        password: extractedPassword,
       });
-      setNewEmployeeId(
-        employeeResponse.emp_id ||
-          employeeResponse.employeeId ||
-          employeeResponse.id ||
-          employeeResponse.userId ||
-          null
+      setCreatedEmployeeId(newEmpId ? String(newEmpId) : null);
+      setLeaveAllocationMessage(
+        newEmpId ? "No leaves assigned yet" : ""
       );
-      setLeaveTypes(
-        toArray(ltResponse?.data || ltResponse)
-          .map(mapLeaveTypeOption)
-          .filter((item) => item.id && item.name)
+      setLeaveAllocationResult([]);
+      setLeaveAllocationError(
+        newEmpId
+          ? ""
+          : "Employee created, but employee ID was not returned for leave assignment"
       );
       setShowSuccessModal(true);
     } catch (error) {
@@ -757,14 +862,19 @@ export default function EmployeeOnboarding() {
         isOpen={showSuccessModal}
         onClose={handleSuccessModalClose}
         credentials={employeeCredentials}
-        onAssignLeave={handleOpenAssignLeave}
+        employeeId={createdEmployeeId}
+        onAddLeave={createdEmployeeId ? handleAddLeaveClick : null}
+        addLeaveLoading={assignLeaveTypesLoading}
+        leaveAllocationMessage={leaveAllocationMessage}
+        leaveAllocationData={leaveAllocationResult}
+        leaveAllocationError={leaveAllocationError}
       />
 
       <AssignLeaveModal
         isOpen={showAssignLeaveModal}
         onClose={() => setShowAssignLeaveModal(false)}
-        employeeId={newEmployeeId}
-        leaveTypes={leaveTypes}
+        employeeId={createdEmployeeId || "-"}
+        leaveTypes={assignLeaveTypes}
         onSubmit={handleAssignLeave}
       />
     </div>

@@ -356,7 +356,7 @@ export default function Departments() {
                     className="w-4 h-4 rounded border-gray-300 accent-[#1a2240] cursor-pointer"
                   />
                 </th>
-                {["Dept ID", "Department Name", "Description", "Status", "Created Date", "Actions"].map((col) => (
+                {["Department Name", "Description", "Status", "Created Date", "Actions"].map((col) => (
                   <th key={col} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     {col}
                   </th>
@@ -415,11 +415,11 @@ export default function Departments() {
                     </td>
 
                     {/* Dept ID */}
-                    <td className="px-4 py-4">
+                    {/* <td className="px-4 py-4">
                       <span className="text-sm font-mono font-medium text-gray-500">
                         {dept.dept_id || "—"}
                       </span>
-                    </td>
+                    </td> */}
 
                     {/* Name */}
                     <td className="px-4 py-4">

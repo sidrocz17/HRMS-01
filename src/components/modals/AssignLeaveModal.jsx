@@ -44,6 +44,7 @@ export default function AssignLeaveModal({
       setLeaveTypeId("");
       setTotalLeaves("");
       setErrors({});
+      onClose();
     } catch (error) {
       console.error("Error submitting leave:", error);
     } finally {

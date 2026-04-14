@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
+import { fetchLoggedInUserDetails } from "../api/userApi";
 
 const API_BASE_URL = (
   import.meta.env.DEV
@@ -109,6 +110,53 @@ export default function XcelTechSplitLogin() {
         image:     data.image || data.user?.image,
         role:      userRole,
       }));
+
+      // Fetch and cache logged-in user details from /api/users
+      try {
+        const cachedUser = JSON.parse(localStorage.getItem("user") || "{}");
+        const details = await fetchLoggedInUserDetails({
+          userId: cachedUser.id || cachedUser.userId || cachedUser.uuid,
+          userName: username,
+        });
+
+        if (details) {
+          const derivedEmpId =
+            details.empId ||
+            details.emp_id ||
+            details.employeeId ||
+            details.employee_id ||
+            details.id ||
+            cachedUser.employeeId ||
+            cachedUser.empId ||
+            cachedUser.emp_id ||
+            null;
+
+          localStorage.setItem("userDetails", JSON.stringify(details));
+          if (derivedEmpId) {
+            localStorage.setItem("employeeId", String(derivedEmpId));
+          }
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              ...cachedUser,
+              // In this backend, the `/api/users` response uses `id` as employee id.
+              ...(derivedEmpId
+                ? {
+                    id: String(derivedEmpId),
+                    employeeId: String(derivedEmpId),
+                    empId: String(derivedEmpId),
+                  }
+                : {}),
+              userName: details.userName ?? cachedUser.userName,
+              isActive: details.isActive ?? cachedUser.isActive,
+              createdAt: details.createdAt ?? cachedUser.createdAt,
+              updatedAt: details.updatedAt ?? cachedUser.updatedAt,
+            })
+          );
+        }
+      } catch (e) {
+        console.error("❌ Failed to fetch /api/users details:", e);
+      }
 
       const redirectPath = ROLE_REDIRECT[userRole] || "/dashboard";
       navigate(redirectPath, { replace: true });

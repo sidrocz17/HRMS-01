@@ -71,6 +71,16 @@ export const updateAttendancePolicy = async (payload) => {
   return response.data;
 };
 
+// ── DELETE /api/attendance-policies/:id ───────
+// Deletes a policy record by id
+export const deleteAttendancePolicy = async (id) => {
+  const response = await axios.delete(
+    `${BASE_URL}/attendance-policies/${id}`,
+    authHeaders()
+  );
+  return response.data;
+};
+
 // ── GET /api/attendance-policy/history ────────
 // Returns list of historical policy changes
 // Response: [{ id, date, updatedBy, minInTime, minOutTime, workingHours, halfDayHours }]

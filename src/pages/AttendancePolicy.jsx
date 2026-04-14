@@ -12,6 +12,7 @@ import AttendancePolicyForm from "../components/attendance/AttendancePolicyForm"
 import { normalizeRole } from "../config/roles.jsx";
 import {
   createAttendancePolicy,
+  deleteAttendancePolicy,
   fetchAttendancePolicy,
   fetchAttendancePolicyHistory,
   updateAttendancePolicy,
@@ -326,29 +327,22 @@ export default function AttendancePolicy() {
     }
   };
 
-  const handleDeleteRow = (rowId) => {
-    setHistory((prev) => {
-      const next = prev.filter((row) => row.id !== rowId);
-
-      if (policy?.id === rowId) {
-        const nextLatest = next[0] || null;
-        setPolicy(
-          nextLatest
-            ? {
-                id: nextLatest.id,
-                minInTime: nextLatest.minInTime,
-                minOutTime: nextLatest.minOutTime,
-                minWorkingHour: nextLatest.workingHours,
-                halfDayHour: nextLatest.halfDayHours,
-                updatedBy: nextLatest.updatedBy,
-                updatedOn: nextLatest.date,
-              }
-            : null
-        );
-      }
-
-      return next;
-    });
+  const handleDeleteRow = async (rowId) => {
+    setSubmitting(true);
+    setApiError("");
+    try {
+      await deleteAttendancePolicy(rowId);
+      await loadAll();
+    } catch (err) {
+      console.error("❌ Delete error:", err);
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to delete policy. Please try again.";
+      setApiError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEditRow = (row) => {
@@ -625,7 +619,8 @@ export default function AttendancePolicy() {
                                 <Tooltip text="Delete">
                                   <button
                                     onClick={() => handleDeleteRow(row.id)}
-                                    className="rounded-lg p-1.5 text-gray-400 transition-all duration-150 hover:bg-red-50 hover:text-red-600"
+                                    disabled={submitting}
+                                    className="rounded-lg p-1.5 text-gray-400 transition-all duration-150 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}

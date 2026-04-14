@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 
 const EMPTY_FORM = {
-  leave_type: "",
+  emp_leave_id: "",
   from_date: "",
   to_date: "",
   days: 0,
@@ -32,12 +32,7 @@ export default function ApplyLeaveModal({
       const diffTime = Math.abs(to - from);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-      let finalDays = diffDays;
-      if (form.type_of_day === "half") {
-        finalDays = 0.5;
-      }
-
-      setForm((prev) => ({ ...prev, days: finalDays }));
+      setForm((prev) => ({ ...prev, days: diffDays }));
     }
   }, [form.from_date, form.to_date, form.type_of_day]);
 
@@ -49,7 +44,7 @@ export default function ApplyLeaveModal({
   const validate = () => {
     const newErrors = {};
 
-    if (!form.leave_type.trim()) newErrors.leave_type = "Leave type is required.";
+    if (!form.emp_leave_id) newErrors.emp_leave_id = "Leave type is required.";
     if (!form.from_date) newErrors.from_date = "Start date is required.";
     if (!form.to_date) newErrors.to_date = "End date is required.";
     if (form.from_date && form.to_date && new Date(form.from_date) > new Date(form.to_date)) {
@@ -63,13 +58,12 @@ export default function ApplyLeaveModal({
   const handleSubmit = () => {
     if (!validate()) return;
     onSubmit({
-      leave_type: form.leave_type,
-      from_date: form.from_date,
-      to_date: form.to_date,
-      days: form.days,
-      type_of_day: form.type_of_day,
-      half_selection: form.type_of_day === "half" ? form.half_selection : null,
-      reason: form.reason,
+      empLeaveId: form.emp_leave_id,
+      leaveDay: form.type_of_day === "half" ? "HALF" : "FULL",
+      description: form.reason,
+      noOfDays: form.days,
+      startDate: form.from_date,
+      endDate: form.to_date,
     });
   };
 
@@ -117,23 +111,23 @@ export default function ApplyLeaveModal({
               Leave Type <span className="text-red-500">*</span>
             </label>
             <select
-              value={form.leave_type}
-              onChange={(e) => handleChange("leave_type", e.target.value)}
-              className={inputClass("leave_type")}
+              value={form.emp_leave_id}
+              onChange={(e) => handleChange("emp_leave_id", e.target.value)}
+              className={inputClass("emp_leave_id")}
             >
               <option value="">Select leave type</option>
               {leaveTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+                <option key={type.id} value={type.id}>
+                  {type.name}
                 </option>
               ))}
             </select>
-            {errors.leave_type && (
+            {errors.emp_leave_id && (
               <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
-                {errors.leave_type}
+                {errors.emp_leave_id}
               </p>
             )}
           </div>

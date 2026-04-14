@@ -4,7 +4,12 @@ export default function SuccessModal({
   isOpen,
   onClose,
   credentials,
-  onAssignLeave,
+  employeeId,
+  onAddLeave,
+  addLeaveLoading = false,
+  leaveAllocationMessage,
+  leaveAllocationData = [],
+  leaveAllocationError,
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
@@ -161,22 +166,68 @@ export default function SuccessModal({
               </button>
             </div>
           </div>
+
+          {/* Leave Allocation */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm font-semibold text-blue-900">Leaves</p>
+            {leaveAllocationError ? (
+              <p className="text-xs text-red-600 mt-1">{leaveAllocationError}</p>
+            ) : (
+              <>
+                <p className="text-xs text-blue-800 mt-1">
+                  {leaveAllocationMessage || "No leaves assigned yet"}
+                </p>
+                {leaveAllocationData.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {leaveAllocationData.map((item, index) => (
+                      <div
+                        key={`${item.leaveTypeName || "leave"}-${index}`}
+                        className="text-xs bg-white border border-blue-100 rounded-md p-2"
+                      >
+                        <p className="font-medium text-gray-900">
+                          {item.leaveTypeName || "-"}
+                        </p>
+                        <p className="text-gray-700">
+                          Total: {item.totalLeaves ?? 0} | Used:{" "}
+                          {item.usedLeaves ?? 0} | Remaining:{" "}
+                          {item.remainingLeaves ?? 0}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 active:scale-95 transition-all"
-          >
-            Go to Employee Status
-          </button>
-          <button
-            onClick={onAssignLeave}
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm"
-          >
-            Assign Leave
-          </button>
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <div className="flex items-center gap-3">
+            {typeof onAddLeave === "function" && employeeId && (
+              <button
+                onClick={onAddLeave}
+                disabled={addLeaveLoading}
+                className={`flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
+                  addLeaveLoading
+                    ? "bg-[#1a2240]/60"
+                    : "bg-[#1a2240] hover:bg-[#243055]"
+                }`}
+              >
+                {addLeaveLoading
+                  ? "Loading..."
+                  : leaveAllocationData.length > 0
+                    ? "Add Another Leave"
+                    : "Add Leave"}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 active:scale-95 transition-all"
+            >
+              Go to Employee Status
+            </button>
+          </div>
         </div>
       </div>
     </div>

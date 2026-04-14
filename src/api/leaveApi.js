@@ -15,22 +15,21 @@ const authHeaders = () => ({
   },
 });
 
-// ── POST /leaves — Apply for leave ────────────
+// ── POST /leaves/apply — Apply for leave ──────
 export const applyLeave = async (formData) => {
   const body = {
-    leaveType: formData.leave_type,
-    fromDate: formData.from_date,
-    toDate: formData.to_date,
-    days: formData.days,
-    typeOfDay: formData.type_of_day,
-    halfSelection: formData.half_selection,
-    reason: formData.reason,
+    empLeaveId: formData.empLeaveId,
+    leaveDay: formData.leaveDay,
+    description: formData.description,
+    noOfDays: formData.noOfDays,
+    startDate: formData.startDate,
+    endDate: formData.endDate,
   };
 
   console.log("📤 Applying leave:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/leaves`,
+    `${BASE_URL}/leaves/apply`,
     body,
     authHeaders()
   );
@@ -86,7 +85,7 @@ export const rejectLeave = async (id, remarks = "") => {
   const body = { remarks };
 
   const response = await axios.put(
-    `${BASE_URL}/leaves/${id}/reject`,
+    `${BASE_URL}/leaves/approve-reject`,
     body,
     authHeaders()
   );
@@ -106,13 +105,14 @@ export const cancelLeave = async (id) => {
   return response.data;
 };
 
-// ── GET /leaves/balance — Get leave balance ──
-export const fetchLeaveBalance = async () => {
-  const response = await axios.get(
-    `${BASE_URL}/leaves/balance`,
-    authHeaders()
-  );
+// ── GET /leaves/balance/{empId} — Get leave balance ──
+// Backward compatible: if empId is omitted, calls `/leaves/balance`.
+export const fetchLeaveBalance = async (empId) => {
+  const path = empId
+    ? `${BASE_URL}/leaves/balance/${empId}`
+    : `${BASE_URL}/leaves/balance`;
 
+  const response = await axios.get(path, authHeaders());
   return response.data;
 };
 
@@ -123,5 +123,60 @@ export const fetchLeaveTypes = async () => {
     authHeaders()
   );
 
+  return response.data;
+};
+
+// ── POST /leaves/approve-reject — Approve or reject leave ──
+export const approveRejectLeave = async (leaveId, action, remarks = "") => {
+  const body = {
+    leaveId,
+    action, // "approve" or "reject"
+    remarks,
+  };
+
+  console.log("📤 Approve/Reject leave:", body);
+
+  const response = await axios.post(
+    `${BASE_URL}/leaves/approve-reject`,
+    body,
+    authHeaders()
+  );
+
+  console.log("📥 Approve/Reject response:", response.data);
+  return response.data;
+};
+
+// ── POST /employee-leaves/allocate/:empId — Allocate leaves ──
+// Some backends allocate defaults with an empty body; others accept a payload.
+export const allocateEmployeeLeaves = async (empId, payload = {}) => {
+  const response = await axios.post(
+    `${BASE_URL}/employee-leaves/allocate/${empId}`,
+    payload,
+    authHeaders()
+  );
+
+  return response.data;
+};
+
+// ── POST yearly leave allocation for all employees (HR/Admin) ──
+// Configure the endpoint via `VITE_YEARLY_LEAVE_POST_ENDPOINT` (examples):
+// - `/api/employee-leaves/allocate/yearly`
+// - `/employee-leaves/allocate/yearly` (will be prefixed with `/api`)
+export const postYearlyLeavesForAllEmployees = async () => {
+  const configured = import.meta.env.VITE_YEARLY_LEAVE_POST_ENDPOINT;
+  if (!configured) {
+    throw new Error(
+      "Yearly leave endpoint not configured (set VITE_YEARLY_LEAVE_POST_ENDPOINT)"
+    );
+  }
+
+  const endpoint = String(configured).trim();
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : endpoint.startsWith("/api")
+      ? endpoint
+      : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
+  const response = await axios.post(url, {}, authHeaders());
   return response.data;
 };
