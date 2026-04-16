@@ -68,7 +68,7 @@ const getDaysUntil = (dateStr) => {
 export default function HolidayCalendar() {
   // ── RBAC ──────────────────────────────────────
   const role = normalizeRole(localStorage.getItem("role"));
-  const isAdmin = role === "admin";
+  const canManage = role === "admin" || role === "hr";
 
   // ── Year ──────────────────────────────────────
   const currentYear = new Date().getFullYear();
@@ -158,25 +158,6 @@ export default function HolidayCalendar() {
     return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
   };
 
-  // ── Access Denied ─────────────────────────────
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Access Denied</h2>
-          <p className="text-sm text-gray-500">You don't have permission to manage holidays.</p>
-          <p className="text-xs text-gray-400 mt-1">Admin access required.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-8">
 
@@ -184,10 +165,12 @@ export default function HolidayCalendar() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 leading-tight">
-            Holiday Calendar
+            {canManage ? "Holiday Calendar" : "Holiday List"}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Manage company holidays for the calendar year
+            {canManage
+              ? "Manage company holidays for the calendar year"
+              : "View company holidays for the calendar year"}
           </p>
         </div>
 
@@ -202,15 +185,17 @@ export default function HolidayCalendar() {
             ))}
           </select>
 
-          <button
-            onClick={handleAdd}
-            className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Holiday
-          </button>
+          {canManage && (
+            <button
+              onClick={handleAdd}
+              className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Holiday
+            </button>
+          )}
         </div>
       </div>
 
@@ -312,7 +297,13 @@ export default function HolidayCalendar() {
             {/* Head */}
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
-                {["Holiday Name", "Date", "Type", "Year", "Actions"].map((col) => (
+                {[
+                  "Holiday Name",
+                  "Date",
+                  "Type",
+                  "Year",
+                  ...(canManage ? ["Actions"] : []),
+                ].map((col) => (
                   <th key={col} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     {col}
                   </th>
@@ -326,7 +317,7 @@ export default function HolidayCalendar() {
               {/* Loading */}
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={canManage ? 5 : 4} className="px-6 py-16 text-center">
                     <div className="flex items-center justify-center gap-2 text-gray-400">
                       <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -341,7 +332,7 @@ export default function HolidayCalendar() {
 
                 /* Empty state */
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center">
+                  <td colSpan={canManage ? 5 : 4} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                       <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center">
                         <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,7 +348,7 @@ export default function HolidayCalendar() {
                             : `No holidays configured for ${selectedYear}`}
                         </p>
                       </div>
-                      {!search && (
+                      {!search && canManage && (
                         <button
                           onClick={handleAdd}
                           className="mt-1 text-xs font-semibold text-[#1a2240] hover:underline"
@@ -415,36 +406,37 @@ export default function HolidayCalendar() {
                       <span className="text-sm font-mono font-medium text-gray-500">{h.calendarYear}</span>
                     </td>
 
-                    {/* Actions */}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1">
+                    {canManage && (
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
 
-                        <Tooltip text="Edit">
-                          <button
-                            onClick={() => handleEdit(h)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all duration-150"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        </Tooltip>
+                          <Tooltip text="Edit">
+                            <button
+                              onClick={() => handleEdit(h)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all duration-150"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          </Tooltip>
 
-                        <Tooltip text="Delete">
-                          <button
-                            onClick={() => setDeleteTarget(h)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </Tooltip>
+                          <Tooltip text="Delete">
+                            <button
+                              onClick={() => setDeleteTarget(h)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </Tooltip>
 
-                      </div>
-                    </td>
+                        </div>
+                      </td>
+                    )}
 
                   </tr>
                 );

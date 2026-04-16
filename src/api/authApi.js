@@ -1,7 +1,8 @@
 import axios from "axios";
 import { getAccessToken, clearSession } from "../utils/authStorage";
+import { buildUrl } from "./apiBase";
 
-const LOGOUT_PATH = "/auth/logout";
+const LOGOUT_PATH = buildUrl("/auth/logout");
 
 const authHeaders = () => {
   const token = getAccessToken();

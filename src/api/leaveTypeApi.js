@@ -1,8 +1,7 @@
 // src/api/leaveTypeApi.js
 
 import axios from "axios";
-
-const BASE_URL = "/api";
+import { buildApiUrl } from "./apiBase";
 
 const authHeaders = () => ({
   headers: {
@@ -28,7 +27,7 @@ export const createLeaveType = async (formData) => {
   console.log("📤 Sending to API:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/leaveType`,
+    buildApiUrl("/leaveType"),
     body,
     authHeaders()
   );
@@ -40,7 +39,7 @@ export const createLeaveType = async (formData) => {
 // ── DELETE /leaveType/:id ─────────────────────
 export const deleteLeaveType = async (id) => {
   const response = await axios.delete(
-    `${BASE_URL}/leaveType/${id}`,
+    buildApiUrl(`/leaveType/${id}`),
     authHeaders()
   );
 
@@ -51,7 +50,7 @@ export const deleteLeaveType = async (id) => {
 // ── GET /leaveTypes ───────────────────────────
 export const fetchLeaveTypes = async () => {
   const response = await axios.get(
-    `${BASE_URL}/leaveTypes`,
+    buildApiUrl("/leaveTypes"),
     authHeaders()
   );
   return response.data;

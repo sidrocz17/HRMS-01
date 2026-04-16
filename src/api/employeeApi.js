@@ -1,7 +1,6 @@
 // src/api/employeeApi.js
 import axios from "axios";
-
-const BASE_URL = "/api";
+import { buildApiUrl } from "./apiBase";
 
 const authHeaders = () => ({
   headers: {
@@ -13,7 +12,7 @@ const authHeaders = () => ({
 export const createEmployee = async (formData) => {
   try {
     const response = await axios.post(
-      `${BASE_URL}/employees/onboarding`,
+      buildApiUrl("/employees/onboarding"),
       JSON.stringify(formData),
       authHeaders()
     );

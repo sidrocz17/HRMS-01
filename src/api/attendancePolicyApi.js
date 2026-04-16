@@ -5,8 +5,7 @@
 // ─────────────────────────────────────────────
 
 import axios from "axios";
-
-const BASE_URL = "/api";
+import { buildApiUrl } from "./apiBase";
 
 const authHeaders = () => ({
   headers: {
@@ -24,7 +23,7 @@ const withSeconds = (timeValue) => {
 // Returns the current active attendance policy
 // Response: { id, minInTime, minOutTime, minWorkingHour, halfDayHour, updatedBy, updatedOn }
 export const fetchAttendancePolicy = async () => {
-  const response = await axios.get(`${BASE_URL}/attendance-policy`, authHeaders());
+  const response = await axios.get(buildApiUrl("/attendance-policy"), authHeaders());
   return response.data?.data ?? response.data;
 };
 
@@ -43,7 +42,7 @@ export const createAttendancePolicy = async (payload) => {
 
   console.log("📤 Creating attendance policy:", body);
   const response = await axios.post(
-    `${BASE_URL}/attendance-policy`,
+    buildApiUrl("/attendance-policy"),
     body,
     authHeaders()
   );
@@ -64,7 +63,7 @@ export const updateAttendancePolicy = async (payload) => {
   };
 
   const response = await axios.put(
-    `${BASE_URL}/attendance-policy`,
+    buildApiUrl("/attendance-policy"),
     body,
     authHeaders()
   );
@@ -75,7 +74,7 @@ export const updateAttendancePolicy = async (payload) => {
 // Deletes a policy record by id
 export const deleteAttendancePolicy = async (id) => {
   const response = await axios.delete(
-    `${BASE_URL}/attendance-policies/${id}`,
+    buildApiUrl(`/attendance-policies/${id}`),
     authHeaders()
   );
   return response.data;

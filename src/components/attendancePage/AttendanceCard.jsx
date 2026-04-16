@@ -60,6 +60,8 @@ function todayLabel() {
 // ── Component ─────────────────────────────────
 export default function AttendanceCard({
   status,        // "NOT_STARTED" | "WORKING" | "COMPLETED"
+  canPunchIn,
+  canPunchOut,
   todayRecord,   // { inISO, outISO } or null
   onPunchIn,
   onPunchOut,
@@ -167,9 +169,9 @@ export default function AttendanceCard({
         {/* Punch In */}
         <button
           onClick={onPunchIn}
-          disabled={status !== "NOT_STARTED" || submitting}
+          disabled={!canPunchIn || submitting}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150 shadow-sm
-            ${status === "NOT_STARTED" && !submitting
+            ${canPunchIn && !submitting
               ? "bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white"
               : "bg-gray-100 text-gray-400 cursor-not-allowed"
             }`}
@@ -178,15 +180,15 @@ export default function AttendanceCard({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
           </svg>
-          {submitting && status === "NOT_STARTED" ? "Punching In..." : "Punch In"}
+          {submitting && canPunchIn ? "Punching In..." : "Punch In"}
         </button>
 
         {/* Punch Out */}
         <button
           onClick={onPunchOut}
-          disabled={status !== "WORKING" || submitting}
+          disabled={!canPunchOut || submitting}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150 shadow-sm
-            ${status === "WORKING" && !submitting
+            ${canPunchOut && !submitting
               ? "bg-red-600 hover:bg-red-700 active:scale-95 text-white"
               : "bg-gray-100 text-gray-400 cursor-not-allowed"
             }`}
@@ -195,11 +197,11 @@ export default function AttendanceCard({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          {submitting && status === "WORKING" ? "Punching Out..." : "Punch Out"}
+          {submitting && canPunchOut ? "Punching Out..." : "Punch Out"}
         </button>
 
         {/* Status hint */}
-        {status === "COMPLETED" && (
+        {!canPunchIn && (
           <p className="text-xs text-gray-400 ml-1">
             ✓ Your attendance for today has been recorded.
           </p>

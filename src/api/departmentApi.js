@@ -1,9 +1,7 @@
 // src/api/departmentApi.js
 
 import axios from "axios";
-
-// ── Use relative path — Vite proxy handles the real IP ──
-const BASE_URL = "/api";
+import { buildApiUrl } from "./apiBase";
 
 const authHeaders = () => ({
   headers: {
@@ -23,7 +21,7 @@ export const createDepartment = async (formData) => {
   console.log("📤 Sending to API:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/department`,
+    buildApiUrl("/department"),
     body,
     authHeaders()
   );
@@ -41,7 +39,7 @@ export const updateDepartment = async (id, formData) => {
   };
 
   const response = await axios.put(
-    `${BASE_URL}/department/${id}`,
+    buildApiUrl(`/department/${id}`),
     body,
     authHeaders()
   );
@@ -53,7 +51,7 @@ export const updateDepartment = async (id, formData) => {
 // ── PUT /department/:id/deactivate ────────────
 export const deactivateDepartment = async (id) => {
   const response = await axios.put(
-    `${BASE_URL}/department/${id}/deactivate`,
+    buildApiUrl(`/department/${id}/deactivate`),
     {},
     authHeaders()
   );
@@ -65,7 +63,7 @@ export const deactivateDepartment = async (id) => {
 // ── DELETE /department/:id ────────────────────
 export const deleteDepartment = async (id) => {
   const response = await axios.delete(
-    `${BASE_URL}/department/${id}`,
+    buildApiUrl(`/department/${id}`),
     authHeaders()
   );
 
@@ -76,7 +74,7 @@ export const deleteDepartment = async (id) => {
 // ── GET /departments ──────────────────────────
 export const fetchDepartments = async () => {
   const response = await axios.get(
-    `${BASE_URL}/departments`,
+    buildApiUrl("/departments"),
     authHeaders()
   );
   return response.data;

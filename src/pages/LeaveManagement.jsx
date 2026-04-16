@@ -139,34 +139,50 @@ const mapLeaveBalanceItem = (item = {}, index = 0) => ({
     item.typeName ||
     item.name ||
     "Leave",
+  year: item.year ?? item.calendarYear ?? item.calendar_year ?? null,
   total: item.totalLeaves ?? item.total ?? 0,
   used: item.usedLeaves ?? item.used ?? 0,
   remaining: item.remainingLeaves ?? item.remaining ?? 0,
 });
 
+const getLoggedInEmployeeId = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const userDetails = JSON.parse(localStorage.getItem("userDetails") || "{}");
+
+    return (
+      localStorage.getItem("employeeId") ||
+      user.employeeId ||
+      user.empId ||
+      user.emp_id ||
+      user.id ||
+      userDetails.empId ||
+      userDetails.emp_id ||
+      userDetails.employeeId ||
+      userDetails.employee_id ||
+      userDetails.id ||
+      user.uuid ||
+      ""
+    );
+  } catch {
+    return localStorage.getItem("employeeId") || "";
+  }
+};
+
+const normalizeLeaveBalance = (response) =>
+  toArray(response)
+    .map(mapLeaveBalanceItem)
+    .filter((item) => item.id && item.leave_type)
+    .sort((a, b) => {
+      const yearDiff = Number(b.year || 0) - Number(a.year || 0);
+      if (yearDiff !== 0) return yearDiff;
+      return String(a.leave_type).localeCompare(String(b.leave_type));
+    });
+
 export default function LeaveManagement() {
   // ── RBAC ──────────────────────────────────────
   const role = localStorage.getItem("role") || ROLES.EMPLOYEE;
-  const loggedInEmployeeId = (() => {
-    try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const userDetails = JSON.parse(localStorage.getItem("userDetails") || "{}");
-      return (
-        localStorage.getItem("employeeId") ||
-        user.employeeId ||
-        user.empId ||
-        user.emp_id ||
-        user.id ||
-        userDetails.empId ||
-        userDetails.employeeId ||
-        userDetails.id ||
-        user.uuid ||
-        ""
-      );
-    } catch {
-      return localStorage.getItem("employeeId") || "";
-    }
-  })();
+  const loggedInEmployeeId = getLoggedInEmployeeId();
   const hasEmployeeId = Boolean(String(loggedInEmployeeId || "").trim());
 
   // ── State ─────────────────────────────────────
@@ -192,11 +208,7 @@ export default function LeaveManagement() {
         ]);
 
         if (balanceResult.status === "fulfilled") {
-          const mapped = toArray(balanceResult.value)
-            .map(mapLeaveBalanceItem)
-            .filter((item) => item.id && item.leave_type);
-
-          setLeaveBalance(mapped);
+          setLeaveBalance(normalizeLeaveBalance(balanceResult.value));
         } else {
           setLeaveBalance([]);
           // Don't block the page if employeeId is missing; show a message only when user tries to apply.
@@ -259,10 +271,7 @@ export default function LeaveManagement() {
     try {
       if (!hasEmployeeId) return response;
       const refreshed = await fetchLeaveBalance(loggedInEmployeeId);
-      const mapped = toArray(refreshed)
-        .map(mapLeaveBalanceItem)
-        .filter((item) => item.id && item.leave_type);
-      setLeaveBalance(mapped);
+      setLeaveBalance(normalizeLeaveBalance(refreshed));
     } catch (e) {
       console.error("❌ Failed to refresh leave balance:", e);
     }

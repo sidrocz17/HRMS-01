@@ -6,8 +6,7 @@
 // ─────────────────────────────────────────────
 
 import axios from "axios";
-
-const BASE_URL = "/api";
+import { buildApiUrl } from "./apiBase";
 const DEFAULT_HOLIDAY_TYPE = "National Holiday";
 
 const authHeaders = () => ({
@@ -39,7 +38,7 @@ const isHolidayActive = (holiday) => {
 // Returns: Array of holiday objects for the given year
 // Response shape: [{ holidayId, holidayName, holidayDate, holidayType, calendarYear, ... }]
 export const getHolidays = async (year) => {
-  const response = await axios.get(`${BASE_URL}/holidays`, authHeaders());
+  const response = await axios.get(buildApiUrl("/holidays"), authHeaders());
   const holidays = Array.isArray(response.data) ? response.data.filter(isHolidayActive) : [];
 
   if (!year) return holidays;
@@ -56,7 +55,7 @@ export const getHolidays = async (year) => {
 export const createHoliday = async (payload) => {
   const userId = getUserId();
   const response = await axios.post(
-    `${BASE_URL}/holiday`,
+    buildApiUrl("/holiday"),
     {
       holidayName: payload.holidayName,
       holidayDate: payload.holidayDate,
@@ -76,7 +75,7 @@ export const createHoliday = async (payload) => {
 export const updateHoliday = async (id, payload) => {
   const userId = getUserId();
   const response = await axios.put(
-    `${BASE_URL}/holiday/${id}`,
+    buildApiUrl(`/holiday/${id}`),
     {
       holidayName: payload.holidayName,
       holidayDate: payload.holidayDate,
@@ -93,7 +92,7 @@ export const updateHoliday = async (id, payload) => {
 // Response: { message: "Holiday deleted successfully" }
 export const deleteHoliday = async (id) => {
   const response = await axios.delete(
-    `${BASE_URL}/holiday/${id}/deactivate`,
+    buildApiUrl(`/holiday/${id}/deactivate`),
     authHeaders()
   );
   return response.data;

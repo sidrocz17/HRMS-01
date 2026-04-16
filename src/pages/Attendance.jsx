@@ -14,7 +14,6 @@ import {
   punchIn,
   punchOut,
   getAttendance,
-  getAllAttendance,
 } from "../api/attendanceApi";
 
 // ── Status constants ──────────────────────────
@@ -22,6 +21,66 @@ const STATUS = {
   NOT_STARTED: "NOT_STARTED",
   WORKING: "WORKING",
   COMPLETED: "COMPLETED",
+};
+
+const pad = (value) => String(value).padStart(2, "0");
+
+const getLocalDateKey = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}`;
+};
+
+const getTodayKey = () => getLocalDateKey();
+
+const deriveTodayState = (records = []) => {
+  const todayKey = getTodayKey();
+
+  const todayCandidates = records.filter((record) => {
+    const candidateDate =
+      getLocalDateKey(record.inISO) ||
+      getLocalDateKey(record.outISO) ||
+      "";
+
+    return candidateDate === todayKey;
+  });
+
+  if (!todayCandidates.length) {
+    return {
+      status: STATUS.NOT_STARTED,
+      hasCheckedInToday: false,
+      todayRecord: null,
+    };
+  }
+
+  const sortedRecords = [...todayCandidates].sort((a, b) => {
+    const aTime = new Date(a.outISO || a.inISO || 0).getTime();
+    const bTime = new Date(b.outISO || b.inISO || 0).getTime();
+    return bTime - aTime;
+  });
+
+  const latestInRecord = sortedRecords.find((record) => record.inISO);
+  const latestOutRecord = sortedRecords.find((record) => record.outISO);
+  const hasCheckedInToday = todayCandidates.some(
+    (record) => record.inISO || record.outISO
+  );
+
+  return {
+    status: hasCheckedInToday ? STATUS.WORKING : STATUS.NOT_STARTED,
+    hasCheckedInToday,
+    todayRecord: hasCheckedInToday
+      ? {
+          inISO: latestInRecord?.inISO || latestOutRecord?.inISO || null,
+          outISO: latestOutRecord?.outISO || null,
+        }
+      : null,
+  };
 };
 
 // ── Simple in-memory toast ────────────────────
@@ -83,6 +142,7 @@ export default function Attendance() {
 
   // ── State ──────────────────────────────────────
   const [status, setStatus] = useState(STATUS.NOT_STARTED);
+  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [todayRecord, setTodayRecord] = useState(null); // { inISO, outISO }
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -101,12 +161,28 @@ export default function Attendance() {
   const loadHistory = async () => {
     setLoading(true);
     try {
-      const data = isAdminOrHR
-        ? await getAllAttendance()
-        : await getAttendance();
-      setHistory(data || []);
+      const data = await getAttendance();
+      const nextHistory = data || [];
+      setHistory(nextHistory);
+
+      const {
+        status: derivedStatus,
+        hasCheckedInToday: derivedHasCheckedInToday,
+        todayRecord: derivedRecord,
+      } =
+        deriveTodayState(nextHistory);
+      setStatus(derivedStatus);
+      setHasCheckedInToday(derivedHasCheckedInToday);
+      setTodayRecord(derivedRecord);
     } catch (err) {
       console.error("❌ Failed to load attendance:", err);
+      showToast(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Failed to load attendance.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -117,9 +193,23 @@ export default function Attendance() {
     setSubmitting(true);
     try {
       const result = await punchIn();
-      setTodayRecord({ inISO: result.inTime, outISO: null });
-      setStatus(STATUS.WORKING);
-      showToast("Punched In successfully! Have a great day. 🎉", "success");
+      const nextRecord = {
+        inISO: result.inISO || result.outISO || null,
+        outISO: result.outISO || null,
+      };
+
+      if (nextRecord.inISO && nextRecord.outISO) {
+        setTodayRecord(nextRecord);
+        setStatus(STATUS.WORKING);
+        setHasCheckedInToday(true);
+        showToast("Punched Out successfully! See you tomorrow.", "success");
+      } else {
+        setTodayRecord(nextRecord);
+        setStatus(STATUS.WORKING);
+        setHasCheckedInToday(true);
+        showToast("Punched In successfully! Have a great day.", "success");
+      }
+
       await loadHistory();
     } catch (err) {
       console.error("❌ Punch In failed:", err);
@@ -138,9 +228,23 @@ export default function Attendance() {
     setSubmitting(true);
     try {
       const result = await punchOut();
-      setTodayRecord((prev) => ({ ...prev, outISO: result.outTime }));
-      setStatus(STATUS.COMPLETED);
-      showToast("Punched Out successfully! See you tomorrow. 👋", "success");
+      const nextRecord = {
+        inISO: result.inISO || todayRecord?.inISO || null,
+        outISO: result.outISO || null,
+      };
+
+      if (nextRecord.outISO) {
+        setTodayRecord(nextRecord);
+        setStatus(STATUS.WORKING);
+        setHasCheckedInToday(true);
+        showToast("Punched Out successfully! See you tomorrow.", "success");
+      } else if (nextRecord.inISO) {
+        setTodayRecord(nextRecord);
+        setStatus(STATUS.WORKING);
+        setHasCheckedInToday(true);
+        showToast("Punched In successfully! Have a great day.", "success");
+      }
+
       await loadHistory(); // refresh table
     } catch (err) {
       console.error("❌ Punch Out failed:", err);
@@ -184,6 +288,8 @@ export default function Attendance() {
         <div className="mb-6">
           <AttendanceCard
             status={status}
+            canPunchIn={!hasCheckedInToday}
+            canPunchOut={hasCheckedInToday}
             todayRecord={todayRecord}
             onPunchIn={handlePunchIn}
             onPunchOut={handlePunchOut}

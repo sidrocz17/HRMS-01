@@ -5,11 +5,14 @@ import {
   getRefreshToken,
   setSessionTokens,
 } from "../utils/authStorage";
+import { BASE_URL, buildUrl } from "./apiBase";
 
-const REFRESH_PATH =
-  import.meta.env.VITE_AUTH_REFRESH_PATH || "/auth/refresh";
+const REFRESH_PATH = buildUrl(
+  import.meta.env.VITE_AUTH_REFRESH_PATH || "/auth/refresh"
+);
 
 const httpClient = axios.create({
+  baseURL: BASE_URL || undefined,
   headers: {
     "Content-Type": "application/json",
   },

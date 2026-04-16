@@ -5,8 +5,7 @@
 // ─────────────────────────────────────────────
 
 import axios from "axios";
-
-const BASE_URL = "/api";
+import { BASE_URL, buildApiUrl } from "./apiBase";
 
 const authHeaders = () => ({
   headers: {
@@ -29,7 +28,7 @@ export const applyLeave = async (formData) => {
   console.log("📤 Applying leave:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/leaves/apply`,
+    buildApiUrl("/leaves/apply"),
     body,
     authHeaders()
   );
@@ -41,7 +40,7 @@ export const applyLeave = async (formData) => {
 // ── GET /leaves/my — Get user's leaves ────────
 export const fetchMyLeaves = async () => {
   const response = await axios.get(
-    `${BASE_URL}/leaves/my`,
+    buildApiUrl("/leaves/my"),
     authHeaders()
   );
 
@@ -51,7 +50,7 @@ export const fetchMyLeaves = async () => {
 // ── GET /leaves/team — Get team leaves (HR/Admin) ──
 export const fetchTeamLeaves = async () => {
   const response = await axios.get(
-    `${BASE_URL}/leaves/team`,
+    buildApiUrl("/leaves/team"),
     authHeaders()
   );
 
@@ -61,7 +60,7 @@ export const fetchTeamLeaves = async () => {
 // ── GET /leaves/:id — Get leave details ──────
 export const fetchLeaveDetails = async (id) => {
   const response = await axios.get(
-    `${BASE_URL}/leaves/${id}`,
+    buildApiUrl(`/leaves/${id}`),
     authHeaders()
   );
 
@@ -71,7 +70,7 @@ export const fetchLeaveDetails = async (id) => {
 // ── PUT /leaves/:id/approve — Approve leave ──
 export const approveLeave = async (id) => {
   const response = await axios.put(
-    `${BASE_URL}/leaves/${id}/approve`,
+    buildApiUrl(`/leaves/${id}/approve`),
     {},
     authHeaders()
   );
@@ -85,7 +84,7 @@ export const rejectLeave = async (id, remarks = "") => {
   const body = { remarks };
 
   const response = await axios.put(
-    `${BASE_URL}/leaves/approve-reject`,
+    buildApiUrl("/leaves/approve-reject"),
     body,
     authHeaders()
   );
@@ -97,7 +96,7 @@ export const rejectLeave = async (id, remarks = "") => {
 // ── DELETE /leaves/:id — Cancel leave request ─
 export const cancelLeave = async (id) => {
   const response = await axios.delete(
-    `${BASE_URL}/leaves/${id}`,
+    buildApiUrl(`/leaves/${id}`),
     authHeaders()
   );
 
@@ -109,8 +108,8 @@ export const cancelLeave = async (id) => {
 // Backward compatible: if empId is omitted, calls `/leaves/balance`.
 export const fetchLeaveBalance = async (empId) => {
   const path = empId
-    ? `${BASE_URL}/leaves/balance/${empId}`
-    : `${BASE_URL}/leaves/balance`;
+    ? buildApiUrl(`/leaves/balance/${empId}`)
+    : buildApiUrl("/leaves/balance");
 
   const response = await axios.get(path, authHeaders());
   return response.data;
@@ -119,7 +118,7 @@ export const fetchLeaveBalance = async (empId) => {
 // ── GET /leave-types — Get all leave types ───
 export const fetchLeaveTypes = async () => {
   const response = await axios.get(
-    `${BASE_URL}/leave-types`,
+    buildApiUrl("/leave-types"),
     authHeaders()
   );
 
@@ -137,7 +136,7 @@ export const approveRejectLeave = async (leaveId, action, remarks = "") => {
   console.log("📤 Approve/Reject leave:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/leaves/approve-reject`,
+    buildApiUrl("/leaves/approve-reject"),
     body,
     authHeaders()
   );
@@ -150,7 +149,7 @@ export const approveRejectLeave = async (leaveId, action, remarks = "") => {
 // Expected payload: { empId, joiningDate, year, createdBy }
 export const allocateEmployeeLeaves = async (payload = {}) => {
   const response = await axios.post(
-    `${BASE_URL}/employee-leaves/allocate`,
+    buildApiUrl("/employee-leaves/allocate"),
     payload,
     authHeaders()
   );
@@ -175,7 +174,7 @@ export const postYearlyLeavesForAllEmployees = async () => {
     ? endpoint
     : endpoint.startsWith("/api")
       ? endpoint
-      : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+      : `${BASE_URL}/api${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   const response = await axios.post(url, {}, authHeaders());
   return response.data;

@@ -108,7 +108,9 @@ export default function App() {
         <Route
           path="/holidays"
           element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
+            >
               <DashboardLayout page="holidays" />
             </ProtectedRoute>
           }

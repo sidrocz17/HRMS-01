@@ -1,7 +1,8 @@
 // src/api/employeeManagementApi.js
 import httpClient from "./httpClient";
+import { BASE_URL } from "./apiBase";
 
-const EMPLOYEE_API_PATH = "/api/employees";
+const EMPLOYEE_API_PATH = `${BASE_URL}/api/employees`;
 
 /**
  * Fetch all employees with pagination and filtering

@@ -1,8 +1,7 @@
 // src/api/designationApi.js
 
 import axios from "axios";
-
-const BASE_URL = "/api";
+import { buildApiUrl } from "./apiBase";
 
 const authHeaders = () => ({
   headers: {
@@ -22,7 +21,7 @@ export const createDesignation = async (formData) => {
   console.log("📤 Sending designation to API:", body);
 
   const response = await axios.post(
-    `${BASE_URL}/designation`,
+    buildApiUrl("/designation"),
     body,
     authHeaders()
   );
@@ -40,7 +39,7 @@ export const updateDesignation = async (id, formData) => {
   };
 
   const response = await axios.put(
-    `${BASE_URL}/designation/${id}`,
+    buildApiUrl(`/designation/${id}`),
     body,
     authHeaders()
   );
@@ -52,7 +51,7 @@ export const updateDesignation = async (id, formData) => {
 // ── GET /designations ─────────────────────────
 export const fetchDesignations = async () => {
   const response = await axios.get(
-    `${BASE_URL}/designations`,
+    buildApiUrl("/designations"),
     authHeaders()
   );
 
