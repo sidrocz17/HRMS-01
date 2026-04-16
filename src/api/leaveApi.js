@@ -146,11 +146,11 @@ export const approveRejectLeave = async (leaveId, action, remarks = "") => {
   return response.data;
 };
 
-// ── POST /employee-leaves/allocate/:empId — Allocate leaves ──
-// Some backends allocate defaults with an empty body; others accept a payload.
-export const allocateEmployeeLeaves = async (empId, payload = {}) => {
+// ── POST /employee-leaves/allocate — Allocate leaves for an employee ──
+// Expected payload: { empId, joiningDate, year, createdBy }
+export const allocateEmployeeLeaves = async (payload = {}) => {
   const response = await axios.post(
-    `${BASE_URL}/employee-leaves/allocate/${empId}`,
+    `${BASE_URL}/employee-leaves/allocate`,
     payload,
     authHeaders()
   );

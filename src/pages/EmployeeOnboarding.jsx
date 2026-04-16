@@ -5,6 +5,7 @@ import { createEmployee } from "../api/employeeApi";
 import { getEmployeeById, updateEmployee } from "../api/employeeManagementApi";
 import { fetchDepartments } from "../api/departmentApi";
 import { fetchDesignations } from "../api/designationApi";
+import { fetchEmployeeTypes } from "../api/employeeTypeApi";
 import { allocateEmployeeLeaves } from "../api/leaveApi";
 import { fetchLeaveTypes as fetchLeaveTypesForAssign } from "../api/leaveTypeApi";
 import Stepper from "../components/employee_OB/onboarding/Stepper";
@@ -37,6 +38,7 @@ const INITIAL_FORM_DATA = {
   jobDetails: {
     dept_id: "",
     desig_id: "",
+    employee_type_id: "",
     reporting_manager: "",
     join_date: "",
     offer_letter_num: "",
@@ -72,7 +74,7 @@ const decodeJwtPayload = (token) => {
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(
       normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "="
+      "=",
     );
 
     return JSON.parse(atob(padded));
@@ -119,6 +121,7 @@ const nullIfEmpty = (value) => {
 };
 
 const transformPayload = (data, userId) => {
+  const employeeTypeId = data.jobDetails.employee_type_id || null;
   return {
     firstName: data.basicInfo.first_name.trim(),
     lastName: data.basicInfo.last_name.trim(),
@@ -127,6 +130,9 @@ const transformPayload = (data, userId) => {
     address: data.basicInfo.address.trim(),
     deptId: data.jobDetails.dept_id,
     designationId: data.jobDetails.desig_id,
+    employmentTypeId: employeeTypeId,
+    employeeTypeId: employeeTypeId,
+    empTypeId: employeeTypeId,
     panNum: data.identity.pan_num.trim(),
     aadharNum: data.identity.aadhar_num.trim(),
     passportNum: nullIfEmpty(data.identity.passport_num),
@@ -155,6 +161,23 @@ const mapDesignationOption = (item = {}) => ({
   title: item.title || item.designationName || item.name || "",
 });
 
+const mapEmployeeTypeOption = (item = {}) => ({
+  id:
+    item.id ||
+    item.employeeTypeId ||
+    item.employee_type_id ||
+    item.employmentTypeId ||
+    item.employment_type_id ||
+    "",
+  title: item.name || item.typeName || item.title || item.employeeType || "",
+  isActive:
+    item.isActive ??
+    item.active ??
+    item.is_active ??
+    item.is_active_flag ??
+    true,
+});
+
 const toInputDate = (value) => {
   if (!value) return "";
   const asString = String(value);
@@ -162,7 +185,9 @@ const toInputDate = (value) => {
 };
 
 const firstFilledValue = (...values) =>
-  values.find((value) => value !== undefined && value !== null && value !== "") ?? "";
+  values.find(
+    (value) => value !== undefined && value !== null && value !== "",
+  ) ?? "";
 
 const asObject = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -185,35 +210,36 @@ const getResponseSources = (response) => {
 
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    String(value || "").trim()
+    String(value || "").trim(),
   );
 
 const mapEmployeeToFormData = (employee = {}) => {
   const department = employee.department || employee.department_details || {};
-  const designation = employee.designation || employee.designation_details || {};
+  const designation =
+    employee.designation || employee.designation_details || {};
 
   const mapped = {
     basicInfo: {
       first_name: firstFilledValue(
         employee.first_name,
         employee.firstName,
-        employee.firstname
+        employee.firstname,
       ),
       last_name: firstFilledValue(
         employee.last_name,
         employee.lastName,
-        employee.lastname
+        employee.lastname,
       ),
       email: firstFilledValue(
         employee.email,
         employee.email_id,
-        employee.work_email
+        employee.work_email,
       ),
       phone: firstFilledValue(
         employee.phone,
         employee.phone_num,
         employee.mobile,
-        employee.mobile_num
+        employee.mobile_num,
       ),
       address: firstFilledValue(employee.address, employee.current_address),
     },
@@ -224,7 +250,7 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.departmentId,
         department.id,
         department.dept_id,
-        department.department_id
+        department.department_id,
       ),
       desig_id: firstFilledValue(
         employee.desig_id,
@@ -232,28 +258,36 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.designationId,
         designation.id,
         designation.desig_id,
-        designation.designation_id
+        designation.designation_id,
+      ),
+      employee_type_id: firstFilledValue(
+        employee.employee_type_id,
+        employee.employeeTypeId,
+        employee.employmentTypeId,
+        employee.employment_type_id,
+        employee.empTypeId,
+        employee.emp_type_id,
       ),
       reporting_manager: firstFilledValue(
         employee.reporting_manager,
         employee.reportingManager,
-        employee.manager_id
+        employee.manager_id,
       ),
       join_date: toInputDate(
         firstFilledValue(
           employee.join_date,
           employee.joinDate,
           employee.joining_date,
-          employee.date_of_joining
-        )
+          employee.date_of_joining,
+        ),
       ),
       offer_letter_num: firstFilledValue(
         employee.offer_letter_num,
-        employee.offerLetterNum
+        employee.offerLetterNum,
       ),
       notice_period: firstFilledValue(
         employee.notice_period,
-        employee.noticePeriod
+        employee.noticePeriod,
       ),
     },
     identity: {
@@ -262,9 +296,12 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.aadhar_num,
         employee.aadharNum,
         employee.aadhaar_num,
-        employee.aadhaarNum
+        employee.aadhaarNum,
       ),
-      passport_num: firstFilledValue(employee.passport_num, employee.passportNum),
+      passport_num: firstFilledValue(
+        employee.passport_num,
+        employee.passportNum,
+      ),
     },
     previousEmployment: Array.isArray(employee.previousEmployment)
       ? employee.previousEmployment
@@ -283,6 +320,7 @@ export default function EmployeeOnboarding() {
   const [apiError, setApiError] = useState("");
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [employeeTypes, setEmployeeTypes] = useState([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [employeeCredentials, setEmployeeCredentials] = useState(null);
   const [createdEmployeeId, setCreatedEmployeeId] = useState(null);
@@ -303,21 +341,31 @@ export default function EmployeeOnboarding() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [departmentsData, designationsData] = await Promise.all([
-          fetchDepartments(),
-          fetchDesignations(),
-        ]);
+        const [departmentsData, designationsData, employeeTypesData] =
+          await Promise.all([
+            fetchDepartments(),
+            fetchDesignations(),
+            fetchEmployeeTypes(),
+          ]);
 
         setDepartments(
           toArray(departmentsData)
             .map(mapDepartmentOption)
-            .filter((item) => item.id && item.title)
+            .filter((item) => item.id && item.title),
         );
 
         setDesignations(
           toArray(designationsData)
             .map(mapDesignationOption)
+            .filter((item) => item.id && item.title),
+        );
+
+        setEmployeeTypes(
+          toArray(employeeTypesData)
+            .map(mapEmployeeTypeOption)
             .filter((item) => item.id && item.title)
+            .filter((item) => String(item.isActive) !== "false")
+            .map(({ id, title }) => ({ id, title })),
         );
       } catch (error) {
         console.error("❌ Failed to load onboarding dropdowns:", error);
@@ -352,7 +400,7 @@ export default function EmployeeOnboarding() {
         setApiError(
           error?.response?.data?.message ||
             error?.message ||
-            "Failed to load employee details"
+            "Failed to load employee details",
         );
       }
     };
@@ -452,9 +500,9 @@ export default function EmployeeOnboarding() {
       console.error("❌ Failed to load leave types:", error);
       const message =
         error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          error?.message ||
-          "Failed to load leave types";
+        error?.response?.data?.error ||
+        error?.message ||
+        "Failed to load leave types";
       return { types: null, error: message };
     } finally {
       setAssignLeaveTypesLoading(false);
@@ -462,21 +510,70 @@ export default function EmployeeOnboarding() {
   };
 
   const handleAddLeaveClick = async () => {
-    const { types, error } = await ensureAssignLeaveTypesLoaded();
-    if (!types || types.length === 0) {
-      setLeaveAllocationError(error || "No leave types available to assign");
+    setLeaveAllocationError("");
+    setLeaveAllocationMessage("");
+
+    if (!createdEmployeeId) {
+      setLeaveAllocationError("Employee ID is missing. Cannot post leave.");
       return;
     }
-    setShowAssignLeaveModal(true);
+
+    const joiningDate = String(formData.jobDetails.join_date || "").trim();
+    if (!joiningDate) {
+      setLeaveAllocationError("Joining date is required to post leave.");
+      return;
+    }
+
+    const year = Number(new Date(joiningDate).getFullYear());
+    if (!Number.isFinite(year) || year <= 0) {
+      setLeaveAllocationError("Invalid joining date for leave allocation.");
+      return;
+    }
+
+    const createdBy = getStoredUserId();
+    if (!createdBy) {
+      setLeaveAllocationError("Unable to identify the current user.");
+      return;
+    }
+
+    try {
+      setAssignLeaveTypesLoading(true);
+      const payload = {
+        empId: createdEmployeeId,
+        joiningDate,
+        year,
+        createdBy,
+      };
+
+      const response = await allocateEmployeeLeaves(payload);
+      const message = response?.message || "Leave posted successfully";
+      const data = Array.isArray(response?.data) ? response.data : [];
+
+      setLeaveAllocationMessage(message);
+      setLeaveAllocationResult(data);
+    } catch (error) {
+      console.error("❌ Post leave failed:", error);
+      setLeaveAllocationError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to post leave",
+      );
+    } finally {
+      setAssignLeaveTypesLoading(false);
+    }
   };
 
-  const handleAssignLeave = async ({ employeeId, leaveTypeId, totalLeaves }) => {
+  const handleAssignLeave = async ({
+    employeeId,
+    leaveTypeId,
+    totalLeaves,
+  }) => {
     setLeaveAllocationError("");
     try {
       const payload = { leaveTypeId, totalLeaves };
       const response = await allocateEmployeeLeaves(employeeId, payload);
-      const message =
-        response?.message || "Leave allocated successfully";
+      const message = response?.message || "Leave allocated successfully";
       const data = Array.isArray(response?.data) ? response.data : [];
 
       setLeaveAllocationMessage(message);
@@ -488,7 +585,7 @@ export default function EmployeeOnboarding() {
         error?.response?.data?.message ||
           error?.response?.data?.error ||
           error?.message ||
-          "Failed to assign leave"
+          "Failed to assign leave",
       );
       throw error;
     }
@@ -503,12 +600,10 @@ export default function EmployeeOnboarding() {
           errors.first_name = "First name required";
         if (!formData.basicInfo.last_name.trim())
           errors.last_name = "Last name required";
-        if (!formData.basicInfo.email.trim())
-          errors.email = "Email required";
+        if (!formData.basicInfo.email.trim()) errors.email = "Email required";
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.basicInfo.email))
           errors.email = "Invalid email";
-        if (!formData.basicInfo.phone.trim())
-          errors.phone = "Phone required";
+        if (!formData.basicInfo.phone.trim()) errors.phone = "Phone required";
         else if (!/^\d{10}$/.test(formData.basicInfo.phone.replace(/\D/g, "")))
           errors.phone = "Invalid phone (10 digits)";
         if (!formData.basicInfo.address.trim())
@@ -520,6 +615,8 @@ export default function EmployeeOnboarding() {
           errors.dept_id = "Department required";
         if (!formData.jobDetails.desig_id)
           errors.desig_id = "Designation required";
+        if (!formData.jobDetails.employee_type_id)
+          errors.employee_type_id = "Employee type required";
         if (!formData.jobDetails.join_date)
           errors.join_date = "Joining date required";
         if (!formData.jobDetails.notice_period)
@@ -589,7 +686,7 @@ export default function EmployeeOnboarding() {
       const responseSources = getResponseSources(response);
       const employeeMessage = firstFilledValue(
         ...responseSources.map((item) => item.message),
-        "Employee added successfully"
+        "Employee added successfully",
       );
       const extractedUserId = firstFilledValue(
         ...responseSources.flatMap((item) => [
@@ -604,7 +701,7 @@ export default function EmployeeOnboarding() {
           item.employee_id,
           item.id,
         ]),
-        "-"
+        "-",
       );
       const extractedPassword = firstFilledValue(
         ...responseSources.flatMap((item) => [
@@ -613,7 +710,7 @@ export default function EmployeeOnboarding() {
           item.password,
           item.tempPassword,
         ]),
-        "-"
+        "-",
       );
 
       if (isEditMode) {
@@ -635,7 +732,12 @@ export default function EmployeeOnboarding() {
       ]);
       const newEmpId =
         empIdCandidates.find((value) => isUuid(value)) ||
-        empIdCandidates.find((value) => value !== undefined && value !== null && String(value).trim() !== "") ||
+        empIdCandidates.find(
+          (value) =>
+            value !== undefined &&
+            value !== null &&
+            String(value).trim() !== "",
+        ) ||
         null;
 
       setEmployeeCredentials({
@@ -644,23 +746,21 @@ export default function EmployeeOnboarding() {
         password: extractedPassword,
       });
       setCreatedEmployeeId(newEmpId ? String(newEmpId) : null);
-      setLeaveAllocationMessage(
-        newEmpId ? "No leaves assigned yet" : ""
-      );
+      setLeaveAllocationMessage(newEmpId ? "No leaves assigned yet" : "");
       setLeaveAllocationResult([]);
       setLeaveAllocationError(
         newEmpId
           ? ""
-          : "Employee created, but employee ID was not returned for leave assignment"
+          : "Employee created, but employee ID was not returned for leave assignment",
       );
       setShowSuccessModal(true);
     } catch (error) {
       console.error("❌ Error:", error);
       setApiError(
         error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to create employee"
+          error.response?.data?.error ||
+          error.message ||
+          "Failed to create employee",
       );
     } finally {
       setLoading(false);
@@ -673,11 +773,13 @@ export default function EmployeeOnboarding() {
         (section) =>
           (Array.isArray(section) &&
             section.some((item) =>
-              Object.values(item).some((val) => val !== "" && val !== 0)
+              Object.values(item).some((val) => val !== "" && val !== 0),
             )) ||
           (typeof section === "object" &&
             !Array.isArray(section) &&
-            Object.values(section).some((val) => val !== "" && val !== 0 && val !== null))
+            Object.values(section).some(
+              (val) => val !== "" && val !== 0 && val !== null,
+            )),
       )
     ) {
       if (window.confirm("Discard unsaved changes?")) {
@@ -692,7 +794,9 @@ export default function EmployeeOnboarding() {
     <div className="min-h-screen bg-slate-50 px-6 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Employee Onboarding</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Employee Onboarding
+        </h1>
         <p className="text-sm text-gray-500 mt-0.5">
           {isEditMode
             ? "Update employee details"
@@ -740,6 +844,7 @@ export default function EmployeeOnboarding() {
                 onChange={handleFieldChange}
                 departments={departments}
                 designations={designations}
+                employeeTypes={employeeTypes}
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -752,7 +857,11 @@ export default function EmployeeOnboarding() {
                     placeholder="e.g. OL-2026-001"
                     value={formData.jobDetails.offer_letter_num}
                     onChange={(e) =>
-                      handleFieldChange("jobDetails", "offer_letter_num", e.target.value)
+                      handleFieldChange(
+                        "jobDetails",
+                        "offer_letter_num",
+                        e.target.value,
+                      )
                     }
                     className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none transition-all placeholder:text-gray-300 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
                   />
@@ -787,7 +896,9 @@ export default function EmployeeOnboarding() {
             />
           )}
 
-          {step === 6 && <ReviewStep formData={formData} />}
+          {step === 6 && (
+            <ReviewStep formData={formData} employeeTypes={employeeTypes} />
+          )}
         </div>
 
         {/* Navigation Buttons */}
@@ -849,8 +960,10 @@ export default function EmployeeOnboarding() {
                     </svg>
                     Submitting...
                   </span>
+                ) : isEditMode ? (
+                  "Update"
                 ) : (
-                  isEditMode ? "Update" : "Submit"
+                  "Submit"
                 )}
               </button>
             )}

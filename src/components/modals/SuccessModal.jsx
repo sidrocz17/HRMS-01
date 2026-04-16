@@ -67,9 +67,7 @@ export default function SuccessModal({
                 {credentials?.userId || "-"}
               </div>
               <button
-                onClick={() =>
-                  handleCopy(credentials?.userId || "", "userId")
-                }
+                onClick={() => handleCopy(credentials?.userId || "", "userId")}
                 className={`p-2.5 rounded-lg transition-all ${
                   copiedField === "userId"
                     ? "bg-green-100 text-green-600"
@@ -171,7 +169,9 @@ export default function SuccessModal({
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm font-semibold text-blue-900">Leaves</p>
             {leaveAllocationError ? (
-              <p className="text-xs text-red-600 mt-1">{leaveAllocationError}</p>
+              <p className="text-xs text-red-600 mt-1">
+                {leaveAllocationError}
+              </p>
             ) : (
               <>
                 <p className="text-xs text-blue-800 mt-1">
@@ -214,11 +214,7 @@ export default function SuccessModal({
                     : "bg-[#1a2240] hover:bg-[#243055]"
                 }`}
               >
-                {addLeaveLoading
-                  ? "Loading..."
-                  : leaveAllocationData.length > 0
-                    ? "Add Another Leave"
-                    : "Add Leave"}
+                {addLeaveLoading ? "Posting Leave..." : "Post Leave"}
               </button>
             )}
             <button

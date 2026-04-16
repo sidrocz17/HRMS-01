@@ -1,5 +1,5 @@
 // src/components/employee/onboarding/ReviewStep.jsx
-export default function ReviewStep({ formData }) {
+export default function ReviewStep({ formData, employeeTypes = [] }) {
   const DEPARTMENTS = {
     "1": "Engineering",
     "2": "Sales",
@@ -22,6 +22,10 @@ export default function ReviewStep({ formData }) {
     "3": "Amit Patel",
     "4": "Neha Sharma",
   };
+
+  const employeeTypeLabel =
+    employeeTypes.find((t) => String(t.id) === String(formData.jobDetails.employee_type_id))
+      ?.title || "-";
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -83,6 +87,7 @@ export default function ReviewStep({ formData }) {
           label="Designation"
           value={DESIGNATIONS[formData.jobDetails.desig_id] || "-"}
         />
+        <Field label="Employee Type" value={employeeTypeLabel} />
         <Field
           label="Reporting Manager"
           value={MANAGERS[formData.jobDetails.reporting_manager] || "-"}

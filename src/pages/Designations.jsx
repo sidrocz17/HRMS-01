@@ -15,6 +15,7 @@ import {
   fetchDesignations,
   updateDesignation,
 } from "../api/designationApi";
+import { formatDisplayDate } from "../utils/date";
 
 const PAGE_SIZE = 8;
 
@@ -45,8 +46,8 @@ const normalizeDesignation = (designation, index = 0) => ({
     designation?.isActive ?? designation?.is_active,
     true
   ),
-  created_at: designation?.createdAt || designation?.created_at || "",
-  updated_at: designation?.updatedAt || designation?.updated_at || "",
+  createdOn: formatDisplayDate(designation?.createdOn || designation?.created_at),
+  // updated_at: formatDisplayDate(designation?.updatedAt || designation?.updated_at),
 });
 
 // ── Icon for designation rows ─────────────────
@@ -175,8 +176,10 @@ export default function Designations() {
             createdDesignation?.isActive ??
             createdDesignation?.is_active ??
             formData.is_active,
-          created_at: createdDesignation?.createdAt || createdDesignation?.created_at || now,
-          updated_at: createdDesignation?.updatedAt || createdDesignation?.updated_at || now,
+          created_at:
+            formatDisplayDate(createdDesignation?.createdAt || createdDesignation?.created_at) || now,
+          updated_at:
+            formatDisplayDate(createdDesignation?.updatedAt || createdDesignation?.updated_at) || now,
         }, ...prev]);
       } else {
         const response = await updateDesignation(editTarget.id, formData);
@@ -198,8 +201,7 @@ export default function Designations() {
                     updatedDesignation?.is_active ??
                     formData.is_active,
                   updated_at:
-                    updatedDesignation?.updatedAt ||
-                    updatedDesignation?.updated_at ||
+                    formatDisplayDate(updatedDesignation?.updatedAt || updatedDesignation?.updated_at) ||
                     now,
                 }
               : d
@@ -465,7 +467,7 @@ export default function Designations() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        {d.created_at}
+                        {d.createdOn || "—"}
                       </div>
                     </td>
 

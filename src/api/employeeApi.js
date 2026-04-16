@@ -17,7 +17,26 @@ export const createEmployee = async (formData) => {
       JSON.stringify(formData),
       authHeaders()
     );
-    return response.data;
+    const data = response.data;
+    const hasEmpTypeId =
+      data &&
+      typeof data === "object" &&
+      ("emptypeid" in data ||
+        "empTypeId" in data ||
+        "employeeTypeId" in data ||
+        "employmentTypeId" in data);
+
+    if (data && typeof data === "object" && !hasEmpTypeId) {
+      const requestedTypeId =
+        formData?.emptypeid ||
+        formData?.empTypeId ||
+        formData?.employeeTypeId ||
+        formData?.employmentTypeId ||
+        null;
+      return { ...data, emptypeid: requestedTypeId };
+    }
+
+    return data;
   } catch (error) {
     console.error("❌ Create Employee Error:", error);
     throw error;

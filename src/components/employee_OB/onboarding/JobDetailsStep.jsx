@@ -28,6 +28,7 @@ export default function JobDetailsStep({
   onChange,
   departments = DEPARTMENTS,
   designations = DESIGNATIONS,
+  employeeTypes = [],
   managers = MANAGERS,
 }) {
   const inputClass = (fieldName) =>
@@ -96,6 +97,27 @@ export default function JobDetailsStep({
               ))}
             </select>
             <ErrorMsg field="desig_id" />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Employee Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={data.employee_type_id}
+              onChange={(e) =>
+                onChange("jobDetails", "employee_type_id", e.target.value)
+              }
+              className={inputClass("employee_type_id")}
+            >
+              <option value="">Select employee type</option>
+              {employeeTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.title}
+                </option>
+              ))}
+            </select>
+            <ErrorMsg field="employee_type_id" />
           </div>
 
           <div className="sm:col-span-2">
