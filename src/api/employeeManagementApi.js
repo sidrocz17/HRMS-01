@@ -1,8 +1,8 @@
 // src/api/employeeManagementApi.js
 import httpClient from "./httpClient";
-import { BASE_URL } from "./apiBase";
+import { buildApiUrl } from "./apiBase";
 
-const EMPLOYEE_API_PATH = `${BASE_URL}/api/employees`;
+const EMPLOYEE_API_PATH = buildApiUrl("/employees");
 
 /**
  * Fetch all employees with pagination and filtering
@@ -65,15 +65,12 @@ export const updateEmployeeStatus = async (empId, statusData) => {
 /**
  * Deactivate employee (convenience method)
  * @param {string} empId - Employee ID
- * @param {boolean} deactivateUserLogin - Also deactivate user login
  * @returns {Promise}
  */
-export const deactivateEmployee = async (empId, deactivateUserLogin = true) => {
+export const deactivateEmployee = async (empId) => {
   try {
-    return await updateEmployeeStatus(empId, {
-      employeeActive: false,
-      userActive: !deactivateUserLogin,
-    });
+    const response = await httpClient.delete(`${EMPLOYEE_API_PATH}/${empId}`);
+    return response.data;
   } catch (error) {
     console.error("❌ Deactivate Employee Error:", error);
     throw error;

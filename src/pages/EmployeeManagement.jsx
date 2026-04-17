@@ -4,7 +4,11 @@ import { useNavigate } from "react-router-dom";
 import EmployeeTable from "../components/employeeManagement/EmployeeTable";
 import DeactivateModal from "../components/employeeManagement/DeactivateModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
-import { getEmployees, updateEmployeeStatus } from "../api/employeeManagementApi";
+import {
+  deactivateEmployee,
+  getEmployees,
+  updateEmployeeStatus,
+} from "../api/employeeManagementApi";
 
 const pickEmployeeList = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -150,7 +154,11 @@ export default function EmployeeManagement() {
     setError("");
 
     try {
-      await updateEmployeeStatus(selectedEmployee.emp_id, deactivateData);
+      if (!deactivateData.employeeActive) {
+        await deactivateEmployee(selectedEmployee.emp_id);
+      } else {
+        await updateEmployeeStatus(selectedEmployee.emp_id, deactivateData);
+      }
 
       setEmployees((prev) =>
         prev.map((emp) =>

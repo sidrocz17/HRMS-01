@@ -6,6 +6,12 @@
 import { useState } from "react";
 
 const StatusBadge = ({ status }) => {
+  const normalizedStatus = (() => {
+    const value = String(status || "").trim().toLowerCase();
+    if (!value) return "Pending";
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  })();
+
   const config = {
     Approved: {
       dot: "bg-emerald-400",
@@ -21,12 +27,12 @@ const StatusBadge = ({ status }) => {
     },
   };
 
-  const style = config[status] || config["Pending"];
+  const style = config[normalizedStatus] || config["Pending"];
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${style.pill}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-      {status}
+      {normalizedStatus}
     </span>
   );
 };
@@ -46,8 +52,8 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
 
   const filtered = data.filter(
     (leave) =>
-      leave.employee_name.toLowerCase().includes(search.toLowerCase()) ||
-      leave.leave_type.toLowerCase().includes(search.toLowerCase())
+      String(leave.employee_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      String(leave.leave_type || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -168,7 +174,7 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                           d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      {leave.applied_on}
+                      {leave.applied_on || "-"}
                     </div>
                   </td>
 
@@ -176,7 +182,7 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1">
                       {/* Approve (only for Pending) */}
-                      {leave.status === "Pending" && (
+                      {String(leave.status || "").trim().toLowerCase() === "pending" && (
                         <>
                           <Tooltip text="Approve">
                             <button

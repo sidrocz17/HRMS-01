@@ -47,10 +47,20 @@ export const fetchMyLeaves = async () => {
   return response.data;
 };
 
-// ── GET /leaves/team — Get team leaves (HR/Admin) ──
+// ── GET /leaves/history?empId={empId} — Get leave history for an employee ──
+export const fetchLeaveHistory = async (empId) => {
+  const response = await axios.get(buildApiUrl("/leaves/history"), {
+    ...authHeaders(),
+    params: { empId },
+  });
+
+  return response.data;
+};
+
+// ── GET /leaves/requests — Get pending/all leave requests for HR/Admin ──
 export const fetchTeamLeaves = async () => {
   const response = await axios.get(
-    buildApiUrl("/leaves/team"),
+    buildApiUrl("/leaves/requests"),
     authHeaders()
   );
 
@@ -126,10 +136,19 @@ export const fetchLeaveTypes = async () => {
 };
 
 // ── POST /leaves/approve-reject — Approve or reject leave ──
-export const approveRejectLeave = async (leaveId, action, remarks = "") => {
+export const approveRejectLeave = async (
+  leaveApplicationId,
+  action,
+  remarks = ""
+) => {
+  const status =
+    String(action || "").trim().toLowerCase() === "approve"
+      ? "APPROVED"
+      : "REJECTED";
+
   const body = {
-    leaveId,
-    action, // "approve" or "reject"
+    leaveApplicationId,
+    status,
     remarks,
   };
 
@@ -157,25 +176,22 @@ export const allocateEmployeeLeaves = async (payload = {}) => {
   return response.data;
 };
 
-// ── POST yearly leave allocation for all employees (HR/Admin) ──
-// Configure the endpoint via `VITE_YEARLY_LEAVE_POST_ENDPOINT` (examples):
-// - `/api/employee-leaves/allocate/yearly`
-// - `/employee-leaves/allocate/yearly` (will be prefixed with `/api`)
-export const postYearlyLeavesForAllEmployees = async () => {
-  const configured = import.meta.env.VITE_YEARLY_LEAVE_POST_ENDPOINT;
-  if (!configured) {
-    throw new Error(
-      "Yearly leave endpoint not configured (set VITE_YEARLY_LEAVE_POST_ENDPOINT)"
-    );
+// ── POST /credit-yearly?year={year} — Allocate yearly leaves for all employees ──
+export const postYearlyLeavesForAllEmployees = async (year) => {
+  const normalizedYear = Number.parseInt(year, 10);
+
+  if (!Number.isFinite(normalizedYear)) {
+    throw new Error("A valid year is required");
   }
 
-  const endpoint = String(configured).trim();
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : endpoint.startsWith("/api")
-      ? endpoint
-      : `${BASE_URL}/api${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const response = await axios.post(
+    buildApiUrl("/credit-yearly"),
+    {},
+    {
+      ...authHeaders(),
+      params: { year: normalizedYear },
+    }
+  );
 
-  const response = await axios.post(url, {}, authHeaders());
   return response.data;
 };

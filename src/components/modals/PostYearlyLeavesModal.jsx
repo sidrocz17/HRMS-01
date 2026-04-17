@@ -5,18 +5,25 @@ export default function PostYearlyLeavesModal({
   onClose,
   onConfirm,
 }) {
+  const currentYear = new Date().getFullYear();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [year, setYear] = useState(String(currentYear));
 
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
+    if (!year.trim()) {
+      setError("Year is required");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setMessage("");
     try {
-      const response = await onConfirm?.();
+      const response = await onConfirm?.(year);
       const nextMessage =
         response?.message ||
         response?.data?.message ||
@@ -47,6 +54,21 @@ export default function PostYearlyLeavesModal({
         </div>
 
         <div className="px-6 py-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Year
+            </label>
+            <input
+              type="number"
+              min="2000"
+              max="2100"
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none transition-all placeholder:text-gray-300 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
+              placeholder="Enter year"
+            />
+          </div>
+
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-xs text-amber-900">
               Use this only once per year. If the backend supports idempotency,
@@ -91,4 +113,3 @@ export default function PostYearlyLeavesModal({
     </div>
   );
 }
-

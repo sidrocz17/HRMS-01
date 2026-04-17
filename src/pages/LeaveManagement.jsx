@@ -15,10 +15,13 @@ import PostYearlyLeavesModal from "../components/modals/PostYearlyLeavesModal";
 import {
   applyLeave,
   fetchLeaveBalance,
+  fetchLeaveHistory,
+  fetchTeamLeaves,
   approveRejectLeave,
   postYearlyLeavesForAllEmployees,
 } from "../api/leaveApi";
 import { fetchLeaveTypes } from "../api/leaveTypeApi";
+import { formatDisplayDate } from "../utils/date";
 
 // ── RBAC Config ───────────────────────────────
 const ROLES = {
@@ -26,90 +29,6 @@ const ROLES = {
   HR: "hr",
   ADMIN: "admin",
 };
-
-// ── Dummy data for My Leaves ──────────────────
-const DUMMY_MY_LEAVES = [
-  {
-    id: "1",
-    leave_type: "Sick Leave",
-    from_date: "Apr 15, 2026",
-    to_date: "Apr 17, 2026",
-    days: 3,
-    status: "Approved",
-    applied_on: "Apr 8, 2026",
-  },
-  {
-    id: "2",
-    leave_type: "Casual Leave",
-    from_date: "Apr 20, 2026",
-    to_date: "Apr 20, 2026",
-    days: 0.5,
-    status: "Pending",
-    applied_on: "Apr 8, 2026",
-  },
-  {
-    id: "3",
-    leave_type: "Earned Leave",
-    from_date: "Mar 10, 2026",
-    to_date: "Mar 14, 2026",
-    days: 5,
-    status: "Approved",
-    applied_on: "Mar 1, 2026",
-  },
-  {
-    id: "4",
-    leave_type: "Sick Leave",
-    from_date: "Feb 5, 2026",
-    to_date: "Feb 5, 2026",
-    days: 1,
-    status: "Rejected",
-    applied_on: "Feb 4, 2026",
-  },
-];
-
-// ── Dummy data for Team Leaves (HR/Admin) ─────
-const DUMMY_TEAM_LEAVES = [
-  {
-    id: "t1",
-    employee_name: "John Smith",
-    leave_type: "Casual Leave",
-    from_date: "Apr 12, 2026",
-    to_date: "Apr 12, 2026",
-    days: 1,
-    status: "Approved",
-    applied_on: "Apr 8, 2026",
-  },
-  {
-    id: "t2",
-    employee_name: "Sarah Johnson",
-    leave_type: "Sick Leave",
-    from_date: "Apr 18, 2026",
-    to_date: "Apr 19, 2026",
-    days: 2,
-    status: "Pending",
-    applied_on: "Apr 15, 2026",
-  },
-  {
-    id: "t3",
-    employee_name: "Michael Brown",
-    leave_type: "Earned Leave",
-    from_date: "Apr 25, 2026",
-    to_date: "Apr 30, 2026",
-    days: 6,
-    status: "Approved",
-    applied_on: "Mar 20, 2026",
-  },
-  {
-    id: "t4",
-    employee_name: "Emily Davis",
-    leave_type: "Comp Off",
-    from_date: "Apr 10, 2026",
-    to_date: "Apr 10, 2026",
-    days: 0.5,
-    status: "Approved",
-    applied_on: "Apr 7, 2026",
-  },
-];
 
 const toArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -179,6 +98,118 @@ const normalizeLeaveBalance = (response) =>
       return String(a.leave_type).localeCompare(String(b.leave_type));
     });
 
+const toTitleCaseStatus = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "Pending";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const mapLeaveHistoryItem = (item = {}, index = 0) => ({
+  id:
+    item.leaveApplicationId ||
+    item.leaveId ||
+    item.id ||
+    item.uuid ||
+    String(index + 1),
+  leave_type:
+    item.leaveType ||
+    item.leaveTypeName ||
+    item.leave_type ||
+    item.typeName ||
+    "Leave",
+  from_date: formatDisplayDate(item.startDate || item.fromDate || item.from_date) || "-",
+  to_date: formatDisplayDate(item.endDate || item.toDate || item.to_date) || "-",
+  days: item.noOfDays ?? item.days ?? 0,
+  status: toTitleCaseStatus(item.status),
+  applied_on:
+    formatDisplayDate(
+      item.appliedOn ||
+        item.appliedDate ||
+        item.createdAt ||
+        item.created_at
+    ) || "-",
+  remarks: item.remarks || "",
+  sort_date:
+    item.startDate ||
+    item.fromDate ||
+    item.from_date ||
+    item.appliedOn ||
+    item.appliedDate ||
+    item.createdAt ||
+    item.created_at ||
+    "",
+});
+
+const normalizeLeaveHistory = (response) =>
+  toArray(response)
+    .map(mapLeaveHistoryItem)
+    .filter((item) => item.id)
+    .sort(
+      (a, b) =>
+        new Date(b.sort_date || 0).getTime() - new Date(a.sort_date || 0).getTime()
+    );
+
+const mapTeamLeaveItem = (item = {}, index = 0) => ({
+  id:
+    item.leaveApplicationId ||
+    item.leaveId ||
+    item.id ||
+    item.uuid ||
+    String(index + 1),
+  employee_name:
+    item.employeeName ||
+    item.employee_name ||
+    item.empName ||
+    item.emp_name ||
+    item.fullName ||
+    item.name ||
+    "Employee",
+  employee_id:
+    item.empId ||
+    item.emp_id ||
+    item.employeeId ||
+    item.employee_id ||
+    "",
+  leave_type:
+    item.leaveType ||
+    item.leaveTypeName ||
+    item.leave_type ||
+    item.typeName ||
+    "Leave",
+  from_date:
+    formatDisplayDate(item.startDate || item.fromDate || item.from_date) || "-",
+  to_date:
+    formatDisplayDate(item.endDate || item.toDate || item.to_date) || "-",
+  days: item.noOfDays ?? item.days ?? 0,
+  status: toTitleCaseStatus(item.status),
+  applied_on:
+    formatDisplayDate(
+      item.appliedOn ||
+        item.appliedDate ||
+        item.createdAt ||
+        item.created_at
+    ) || "-",
+  remarks: item.remarks || "",
+  sort_date:
+    item.appliedOn ||
+    item.appliedDate ||
+    item.createdAt ||
+    item.created_at ||
+    item.startDate ||
+    item.fromDate ||
+    item.from_date ||
+    "",
+});
+
+const normalizeTeamLeaves = (response) =>
+  toArray(response)
+    .map(mapTeamLeaveItem)
+    .filter((item) => item.id)
+    .sort(
+      (a, b) =>
+        new Date(b.sort_date || 0).getTime() - new Date(a.sort_date || 0).getTime()
+    );
+
 export default function LeaveManagement() {
   // ── RBAC ──────────────────────────────────────
   const role = localStorage.getItem("role") || ROLES.EMPLOYEE;
@@ -187,8 +218,8 @@ export default function LeaveManagement() {
 
   // ── State ─────────────────────────────────────
   const [activeTab, setActiveTab] = useState("my-leaves");
-  const [myLeaves, setMyLeaves] = useState(DUMMY_MY_LEAVES);
-  const [teamLeaves, setTeamLeaves] = useState(DUMMY_TEAM_LEAVES);
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [teamLeaves, setTeamLeaves] = useState([]);
   const [leaveBalance, setLeaveBalance] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
 
@@ -199,13 +230,19 @@ export default function LeaveManagement() {
   const [approvalAction, setApprovalAction] = useState(null);
   const [apiError, setApiError] = useState("");
 
+  const canViewTeamLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
+  const canPostYearlyLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
+
   useEffect(() => {
     const loadLeaveData = async () => {
       try {
-        const [balanceResult, leaveTypesResult] = await Promise.allSettled([
+        const [balanceResult, historyResult, teamLeavesResult, leaveTypesResult] =
+          await Promise.allSettled([
           hasEmployeeId ? fetchLeaveBalance(loggedInEmployeeId) : Promise.resolve([]),
+          hasEmployeeId ? fetchLeaveHistory(loggedInEmployeeId) : Promise.resolve([]),
+          canViewTeamLeaves ? fetchTeamLeaves() : Promise.resolve([]),
           fetchLeaveTypes(),
-        ]);
+          ]);
 
         if (balanceResult.status === "fulfilled") {
           setLeaveBalance(normalizeLeaveBalance(balanceResult.value));
@@ -217,6 +254,32 @@ export default function LeaveManagement() {
               balanceResult.reason?.response?.data?.message ||
                 balanceResult.reason?.message ||
                 "Failed to load leave balance"
+            );
+          }
+        }
+
+        if (historyResult.status === "fulfilled") {
+          setMyLeaves(normalizeLeaveHistory(historyResult.value));
+        } else {
+          setMyLeaves([]);
+          if (hasEmployeeId) {
+            setApiError(
+              historyResult.reason?.response?.data?.message ||
+                historyResult.reason?.message ||
+                "Failed to load leave history"
+            );
+          }
+        }
+
+        if (teamLeavesResult.status === "fulfilled") {
+          setTeamLeaves(normalizeTeamLeaves(teamLeavesResult.value));
+        } else {
+          setTeamLeaves([]);
+          if (canViewTeamLeaves) {
+            setApiError(
+              teamLeavesResult.reason?.response?.data?.message ||
+                teamLeavesResult.reason?.message ||
+                "Failed to load leave requests"
             );
           }
         }
@@ -245,7 +308,7 @@ export default function LeaveManagement() {
     };
 
     loadLeaveData();
-  }, [hasEmployeeId, loggedInEmployeeId]);
+  }, [canViewTeamLeaves, hasEmployeeId, loggedInEmployeeId]);
 
   const resolveLeaveTypeName = (balanceItem) => {
     if (!leaveTypes.length) return balanceItem.leave_type;
@@ -266,8 +329,8 @@ export default function LeaveManagement() {
     return matchedByName?.name || balanceItem.leave_type;
   };
 
-  const handlePostYearlyLeaves = async () => {
-    const response = await postYearlyLeavesForAllEmployees();
+  const handlePostYearlyLeaves = async (year) => {
+    const response = await postYearlyLeavesForAllEmployees(year);
     try {
       if (!hasEmployeeId) return response;
       const refreshed = await fetchLeaveBalance(loggedInEmployeeId);
@@ -286,33 +349,10 @@ export default function LeaveManagement() {
       const response = await applyLeave(formData);
       console.log("✅ Leave apply response:", response);
 
-      const selectedLeave = leaveBalance.find(
-        (item) => item.id === formData.empLeaveId,
-      );
-
-      const leaveTypeName = selectedLeave?.leave_type || "Leave";
-      const leaveDayLabel = formData.leaveDay === "HALF" ? " (Half Day)" : "";
-
-      const newLeave = {
-        id:
-          response?.data?.id ||
-          response?.id ||
-          response?.data?.leaveId ||
-          response?.leaveId ||
-          String(myLeaves.length + 1),
-        leave_type: `${leaveTypeName}${leaveDayLabel}`,
-        from_date: formData.startDate,
-        to_date: formData.endDate,
-        days: formData.noOfDays,
-        status: "Pending",
-        applied_on: new Date().toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-      };
-
-      setMyLeaves((prev) => [newLeave, ...prev]);
+      if (hasEmployeeId) {
+        const refreshedHistory = await fetchLeaveHistory(loggedInEmployeeId);
+        setMyLeaves(normalizeLeaveHistory(refreshedHistory));
+      }
       setShowApplyModal(false);
     } catch (error) {
       console.error("❌ Apply leave failed:", error);
@@ -342,17 +382,14 @@ export default function LeaveManagement() {
       setApiError("");
       await approveRejectLeave(approvalTarget.id, action, remarks);
 
-      const updatedStatus = action === "approve" ? "Approved" : "Rejected";
-
-      setTeamLeaves((prev) =>
-        prev.map((l) =>
-          l.id === approvalTarget.id ? { ...l, status: updatedStatus } : l,
-        ),
-      );
+      if (canViewTeamLeaves) {
+        const refreshedRequests = await fetchTeamLeaves();
+        setTeamLeaves(normalizeTeamLeaves(refreshedRequests));
+      }
 
       console.log(`Leave ${action}ed:`, {
         leaveId: approvalTarget.id,
-        status: updatedStatus,
+        status: action === "approve" ? "Approved" : "Rejected",
         remarks,
       });
 
@@ -371,10 +408,6 @@ export default function LeaveManagement() {
   const handleCancelLeave = (leaveId) => {
     setMyLeaves((prev) => prev.filter((l) => l.id !== leaveId));
   };
-
-  // ── Access check ──────────────────────────────
-  const canViewTeamLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
-  const canPostYearlyLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-8">
