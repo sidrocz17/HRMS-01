@@ -2,16 +2,11 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
+import { buildUrl } from "../api/apiBase";
 import {
   fetchLoggedInUserContext,
   getEmployeeIdentity,
 } from "../api/userApi";
-
-const API_BASE_URL = (
-  import.meta.env.DEV
-    ? ""
-    : (import.meta.env.VITE_API_BASE_URL || "http://172.16.219.107:8080")
-).replace(/\/+$/, "");
 
 const NetworkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -81,7 +76,7 @@ export default function XcelTechSplitLogin() {
     setLoading(true);
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/auth/login`,
+        buildUrl("/auth/login"),
         { username, password },
         {
           headers: {
@@ -230,14 +225,14 @@ export default function XcelTechSplitLogin() {
         "Login failed ❌";
 
       console.error("Login error:", {
-        url: `${API_BASE_URL}/auth/login`,
+        url: buildUrl("/auth/login"),
         status,
         data: errorData,
         message: error.message,
       });
 
       if (status === 400) {
-        alert(`${message}\nAPI: ${API_BASE_URL}/auth/login`);
+        alert(`${message}\nAPI: ${buildUrl("/auth/login")}`);
       } else {
         alert(message);
       }
