@@ -7,10 +7,14 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import LeavePolicyForm, { deriveYearDates } from "../components/leavepolicy/LeavePolicyForm";
-import DeleteConfirm                         from "../components/leavepolicy/DeleteConfirm";
+import LeavePolicyForm, {
+  deriveYearDates,
+} from "../components/leavepolicy/LeavePolicyForm";
+import DeleteConfirm from "../components/leavepolicy/DeleteConfirm";
 import {
   createLeavePolicy,
+  updateLeavePolicy,
+  deleteLeavePolicy,
   fetchLeavePolicies,
   fetchLeaveTypes,
   fetchEmployeeTypes,
@@ -22,9 +26,11 @@ const PAGE_SIZE = 8;
 const Tooltip = ({ text, children }) => (
   <div className="relative group">
     {children}
-    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800
+    <div
+      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800
       text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity
-      duration-150 whitespace-nowrap pointer-events-none z-10">
+      duration-150 whitespace-nowrap pointer-events-none z-10"
+    >
       {text}
       <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
     </div>
@@ -35,7 +41,176 @@ const Tooltip = ({ text, children }) => (
 const getFYLabel = (start_date) => {
   if (!start_date) return "—";
   const year = new Date(start_date).getFullYear();
-  return `${year}-${year + 1}`;
+  return `${year}-${String(year + 1).slice(-2)}`;
+};
+
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.items)) return value.items;
+  return [];
+};
+
+const normalizeLabelValue = (value) => {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (value && typeof value === "object") {
+    return (
+      value.label ||
+      value.name ||
+      value.title ||
+      value.type ||
+      value.typeName ||
+      value.employeeType ||
+      value.employee_type ||
+      value.employmentType ||
+      value.employment_type_name ||
+      value.employmentTypeName ||
+      value.leaveType ||
+      value.leave_type ||
+      ""
+    );
+  }
+
+  return "";
+};
+
+const mapOption = (item = {}, idKeys = [], labelKeys = []) => ({
+  id: idKeys.map((key) => item?.[key]).find(Boolean) || "",
+  label:
+    labelKeys.map((key) => normalizeLabelValue(item?.[key])).find(Boolean) ||
+    "",
+});
+
+const mapLeaveTypeOption = (item) =>
+  mapOption(
+    item,
+    ["id", "typeId", "type_id"],
+    ["name", "title", "type", "typeName", "leaveType"],
+  );
+
+const mapEmployeeTypeOption = (item) =>
+  mapOption(
+    item,
+    [
+      "id",
+      "employeeTypeId",
+      "employee_type_id",
+      "employmentTypeId",
+      "employment_type_id",
+    ],
+    [
+      "name",
+      "title",
+      "type",
+      "typeName",
+      "employeeType",
+      "employee_type",
+      "employmentType",
+      "employment_type_name",
+      "employmentTypeName",
+    ],
+  );
+
+const mapPolicyItem = (d = {}) => ({
+  id: d.policyId || d.id || d.policy_id || uuidv4(),
+  type_id: d.typeId || d.type_id || "",
+  employee_type_id:
+    d.employeeTypeId ||
+    d.employee_type_id ||
+    d.employmentTypeId ||
+    d.employment_type_id ||
+    "",
+  no_of_days: d.noOfDays ?? d.no_of_days ?? 0,
+  start_date: d.startDate || d.start_date || "",
+  end_date: d.endDate || d.end_date || "",
+  financial_year: getFYLabel(d.startDate || d.start_date),
+  leave_type_label:
+    normalizeLabelValue(d.leaveTypeName) ||
+    normalizeLabelValue(d.leave_type_name) ||
+    normalizeLabelValue(d.leaveType) ||
+    normalizeLabelValue(d.typeName) ||
+    normalizeLabelValue(d.name) ||
+    normalizeLabelValue(d.title) ||
+    normalizeLabelValue(d.type) ||
+    "",
+  employee_type_label:
+    normalizeLabelValue(d.employeeTypeName) ||
+    normalizeLabelValue(d.employee_type_name) ||
+    normalizeLabelValue(d.employeeType) ||
+    normalizeLabelValue(d.employmentTypeName) ||
+    normalizeLabelValue(d.employment_type_name) ||
+    normalizeLabelValue(d.employmentType) ||
+    normalizeLabelValue(d.typeName) ||
+    normalizeLabelValue(d.name) ||
+    normalizeLabelValue(d.title) ||
+    normalizeLabelValue(d.type) ||
+    "",
+});
+
+const decodeJwtPayload = (token) => {
+  try {
+    const [, payload = ""] = token.split(".");
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const getCreatedBy = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const token = localStorage.getItem("token");
+    const tokenPayload = token ? decodeJwtPayload(token) : null;
+
+    return (
+      user.id ||
+      user.userId ||
+      user.uuid ||
+      user.employeeId ||
+      user.empId ||
+      user.user_id ||
+      tokenPayload?.userId ||
+      tokenPayload?.id ||
+      tokenPayload?.sub ||
+      tokenPayload?.uid ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+};
+
+const getFinancialYearDates = (financialYear) => {
+  const normalizedYear = String(financialYear || "").trim();
+
+  if (!normalizedYear) {
+    return { startDate: "", endDate: "" };
+  }
+
+  const [rawStartYear = "", rawEndYear = ""] = normalizedYear.split("-");
+  const startYear = rawStartYear.trim();
+  const endSuffix = rawEndYear.trim();
+
+  if (!startYear || !endSuffix) {
+    return { startDate: "", endDate: "" };
+  }
+
+  const endYear =
+    endSuffix.length === 2 ? `${startYear.slice(0, 2)}${endSuffix}` : endSuffix;
+
+  return {
+    startDate: `${startYear}-04-01`,
+    endDate: `${endYear}-03-31`,
+  };
 };
 
 export default function LeavePolicy() {
@@ -43,23 +218,23 @@ export default function LeavePolicy() {
   const role = localStorage.getItem("role") || "";
 
   // ── Data state ────────────────────────────────
-  const [policies, setPolicies]         = useState([]);
-  const [leaveTypes, setLeaveTypes]     = useState([]);
+  const [policies, setPolicies] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
   const [employeeTypes, setEmployeeTypes] = useState([]);
-  const [search, setSearch]             = useState("");
-  const [selectedIds, setSelectedIds]   = useState([]);
-  const [currentPage, setCurrentPage]   = useState(1);
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // ── Modal state ───────────────────────────────
-  const [showForm, setShowForm]         = useState(false);
-  const [formMode, setFormMode]         = useState("add");
-  const [editTarget, setEditTarget]     = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [formMode, setFormMode] = useState("add");
+  const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── API state ─────────────────────────────────
-  const [loading, setLoading]       = useState(false);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [apiError, setApiError]     = useState("");
+  const [apiError, setApiError] = useState("");
 
   // ── Load all data on mount ────────────────────
   useEffect(() => {
@@ -70,45 +245,72 @@ export default function LeavePolicy() {
 
   const loadAll = async () => {
     setLoading(true);
+    setApiError("");
+
     try {
-      const [policiesData, leaveTypesData, employeeTypesData] = await Promise.all([
-        fetchLeavePolicies(),
-        fetchLeaveTypes(),
-        fetchEmployeeTypes(),
-      ]);
+      const [policiesResult, leaveTypesResult, employeeTypesResult] =
+        await Promise.allSettled([
+          fetchLeavePolicies(),
+          fetchLeaveTypes(),
+          fetchEmployeeTypes(),
+        ]);
 
-      console.log("✅ Policies:", policiesData);
-      console.log("✅ Leave types:", leaveTypesData);
-      console.log("✅ Employee types:", employeeTypesData);
+      if (leaveTypesResult.status === "fulfilled") {
+        console.log("✅ Leave types:", leaveTypesResult.value);
+        setLeaveTypes(
+          toArray(leaveTypesResult.value)
+            .map(mapLeaveTypeOption)
+            .filter((item) => item.id),
+        );
+      } else {
+        console.error(
+          "❌ Failed to load leave types:",
+          leaveTypesResult.reason,
+        );
+      }
 
-      // ── Map leave types ──────────────────────
-      setLeaveTypes(leaveTypesData.map((d) => ({
-        id:   d.typeId    || d.id    || d.type_id,
-        type: d.type      || d.name  || d.leaveType || "",
-      })));
+      if (employeeTypesResult.status === "fulfilled") {
+        console.log("✅ Employee types:", employeeTypesResult.value);
+        setEmployeeTypes(
+          toArray(employeeTypesResult.value)
+            .map(mapEmployeeTypeOption)
+            .filter((item) => item.id),
+        );
+      } else {
+        console.error(
+          "❌ Failed to load employee types:",
+          employeeTypesResult.reason,
+        );
+      }
 
-      // ── Map employee types ───────────────────
-      setEmployeeTypes(employeeTypesData.map((d) => ({
-        id:   d.employeeTypeId || d.id   || d.employee_type_id,
-        type: d.type           || d.name || d.employeeType || "",
-      })));
+      if (policiesResult.status === "fulfilled") {
+        console.log("✅ Policies:", policiesResult.value);
+        setPolicies(toArray(policiesResult.value).map(mapPolicyItem));
+      } else {
+        console.error("❌ Failed to load policies:", policiesResult.reason);
+        setPolicies([]);
+      }
 
-      // ── Map policies ─────────────────────────
-      setPolicies(policiesData.map((d) => ({
-        id:               d.policyId        || d.id              || d.policy_id || uuidv4(),
-        type_id:          d.typeId          || d.type_id,
-        employee_type_id: d.employeeTypeId  || d.employee_type_id,
-        no_of_days:       d.noOfDays        || d.no_of_days       || 0,
-        start_date:       d.startDate       || d.start_date       || "",
-        end_date:         d.endDate         || d.end_date         || "",
-        financial_year:   getFYLabel(d.startDate || d.start_date),
-        // resolved labels for display
-        leave_type_label:    d.leaveTypeName    || d.type           || "",
-        employee_type_label: d.employeeTypeName || d.employeeType   || "",
-      })));
-
+      if (
+        leaveTypesResult.status === "rejected" &&
+        employeeTypesResult.status === "rejected"
+      ) {
+        const error = employeeTypesResult.reason || leaveTypesResult.reason;
+        setApiError(
+          error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            "Failed to load form dropdown data.",
+        );
+      } else if (policiesResult.status === "rejected") {
+        setApiError(
+          policiesResult.reason?.response?.data?.message ||
+            policiesResult.reason?.response?.data?.error ||
+            "Leave policies could not be loaded, but you can still add a policy.",
+        );
+      }
     } catch (error) {
-      console.error("❌ Failed to load data:", error);
+      console.error("❌ Unexpected load error:", error);
+      setApiError("Failed to load leave policy data.");
     } finally {
       setLoading(false);
     }
@@ -117,17 +319,7 @@ export default function LeavePolicy() {
   const loadPolicies = async () => {
     try {
       const data = await fetchLeavePolicies();
-      setPolicies(data.map((d) => ({
-        id:               d.policyId        || d.id              || d.policy_id || uuidv4(),
-        type_id:          d.typeId          || d.type_id,
-        employee_type_id: d.employeeTypeId  || d.employee_type_id,
-        no_of_days:       d.noOfDays        || d.no_of_days       || 0,
-        start_date:       d.startDate       || d.start_date       || "",
-        end_date:         d.endDate         || d.end_date         || "",
-        financial_year:   getFYLabel(d.startDate || d.start_date),
-        leave_type_label:    d.leaveTypeName    || d.type         || "",
-        employee_type_label: d.employeeTypeName || d.employeeType || "",
-      })));
+      setPolicies(toArray(data).map(mapPolicyItem));
     } catch (error) {
       console.error("❌ Failed to refresh policies:", error);
     }
@@ -135,36 +327,50 @@ export default function LeavePolicy() {
 
   // ── Helper: resolve labels from IDs ──────────
   const resolveLabel = (id, list) =>
-    list.find((i) => String(i.id) === String(id))?.type || id || "—";
+    normalizeLabelValue(list.find((i) => String(i.id) === String(id))?.label) ||
+    normalizeLabelValue(id) ||
+    "—";
 
   // ── Filtered + paginated ──────────────────────
-  const filtered = useMemo(() =>
-    policies.filter((p) => {
-      const ltLabel  = p.leave_type_label    || resolveLabel(p.type_id, leaveTypes);
-      const etLabel  = p.employee_type_label || resolveLabel(p.employee_type_id, employeeTypes);
-      const fyLabel  = p.financial_year      || "";
-      const q = search.toLowerCase();
-      return ltLabel.toLowerCase().includes(q) ||
-             etLabel.toLowerCase().includes(q) ||
-             fyLabel.toLowerCase().includes(q);
-    }), [policies, search, leaveTypes, employeeTypes]
+  const filtered = useMemo(
+    () =>
+      policies.filter((p) => {
+        const ltLabel =
+          p.leave_type_label || resolveLabel(p.type_id, leaveTypes);
+        const etLabel =
+          p.employee_type_label ||
+          resolveLabel(p.employee_type_id, employeeTypes);
+        const fyLabel = p.financial_year || "";
+        const q = search.toLowerCase();
+        return (
+          ltLabel.toLowerCase().includes(q) ||
+          etLabel.toLowerCase().includes(q) ||
+          fyLabel.toLowerCase().includes(q)
+        );
+      }),
+    [policies, search, leaveTypes, employeeTypes],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginated = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   // ── Bulk select ───────────────────────────────
-  const allSelected = paginated.length > 0 && paginated.every((p) => selectedIds.includes(p.id));
+  const allSelected =
+    paginated.length > 0 && paginated.every((p) => selectedIds.includes(p.id));
 
   const toggleAll = () =>
-    setSelectedIds(allSelected
-      ? selectedIds.filter((id) => !paginated.find((p) => p.id === id))
-      : [...new Set([...selectedIds, ...paginated.map((p) => p.id)])]
+    setSelectedIds(
+      allSelected
+        ? selectedIds.filter((id) => !paginated.find((p) => p.id === id))
+        : [...new Set([...selectedIds, ...paginated.map((p) => p.id)])],
     );
 
   const toggleOne = (id) =>
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
 
   // ── CRUD ──────────────────────────────────────
@@ -187,12 +393,43 @@ export default function LeavePolicy() {
     setApiError("");
 
     try {
+      const typeId = formData?.type_id || "";
+      const employeeTypeId = formData?.employee_type_id || "";
+      const noOfDays = Number(formData?.no_of_days);
+      const { startDate, endDate } = getFinancialYearDates(
+        formData?.financial_year,
+      );
+      const createdBy = getCreatedBy();
+
+      if (
+        !typeId ||
+        !employeeTypeId ||
+        !formData?.financial_year ||
+        !Number.isFinite(noOfDays) ||
+        noOfDays <= 0
+      ) {
+        setApiError("All fields are required.");
+        return;
+      }
+
+      if (!startDate || !endDate) {
+        setApiError("Invalid financial year selected.");
+        return;
+      }
+
+      if (!createdBy) {
+        setApiError("Unable to identify the current user.");
+        return;
+      }
+
       const body = {
-        typeId:         formData.type_id,
-        employeeTypeId: formData.employee_type_id,
-        noOfDays:       formData.no_of_days,
-        startDate:      formData.start_date,
-        endDate:        formData.end_date,
+        leaveTypeId: typeId,
+        employeeTypeId,
+        noOfDays,
+        year: new Date(startDate).getFullYear(),
+        startDate,
+        endDate,
+        createdBy,
       };
 
       if (formMode === "add") {
@@ -200,30 +437,23 @@ export default function LeavePolicy() {
         console.log("✅ Policy created");
         await loadPolicies();
       } else {
-        // Local update until PUT API is ready
-        setPolicies((prev) =>
-          prev.map((p) =>
-            p.id === editTarget.id
-              ? {
-                  ...p,
-                  ...formData,
-                  financial_year:      formData.financial_year,
-                  leave_type_label:    resolveLabel(formData.type_id, leaveTypes),
-                  employee_type_label: resolveLabel(formData.employee_type_id, employeeTypes),
-                }
-              : p
-          )
-        );
+        if (!editTarget?.id) {
+          setApiError("Unable to identify the policy to update.");
+          return;
+        }
+
+        await updateLeavePolicy(editTarget.id, body);
+        console.log("✅ Policy updated");
+        await loadPolicies();
       }
 
       setShowForm(false);
       setCurrentPage(1);
-
     } catch (error) {
       console.error("❌ API Error:", error);
       const message =
         error.response?.data?.message ||
-        error.response?.data?.error   ||
+        error.response?.data?.error ||
         "Something went wrong. Please try again.";
       setApiError(message);
     } finally {
@@ -231,29 +461,68 @@ export default function LeavePolicy() {
     }
   };
 
-  const handleDeleteClick   = (policy) => setDeleteTarget(policy);
-  const handleDeleteConfirm = () => {
-    setPolicies((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-    setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
-    setDeleteTarget(null);
+  const handleDeleteClick = (policy) => setDeleteTarget(policy);
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget?.id) {
+      setApiError("Unable to identify the policy to delete.");
+      return;
+    }
+
+    try {
+      setApiError("");
+      await deleteLeavePolicy(deleteTarget.id);
+      await loadPolicies();
+      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error("❌ Delete API Error:", error);
+      setApiError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Failed to delete leave policy.",
+      );
+    }
   };
 
-  const handleBulkDelete = () => {
-    setPolicies((prev) => prev.filter((p) => !selectedIds.includes(p.id)));
-    setSelectedIds([]);
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    try {
+      setApiError("");
+      await Promise.all(selectedIds.map((id) => deleteLeavePolicy(id)));
+      await loadPolicies();
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("❌ Bulk delete API Error:", error);
+      setApiError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Failed to delete selected leave policies.",
+      );
+    }
   };
 
   // ── Pagination ────────────────────────────────
   const getPageNumbers = () => {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (totalPages <= 5)
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     if (currentPage <= 3) return [1, 2, 3, "...", totalPages];
-    if (currentPage >= totalPages - 2) return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+    if (currentPage >= totalPages - 2)
+      return [1, "...", totalPages - 2, totalPages - 1, totalPages];
+    return [
+      1,
+      "...",
+      currentPage - 1,
+      currentPage,
+      currentPage + 1,
+      "...",
+      totalPages,
+    ];
   };
 
   // ── Existing keys for duplicate detection ─────
   const existingKeys = policies.map(
-    (p) => `${p.type_id}_${p.employee_type_id}_${p.financial_year}`
+    (p) => `${p.type_id}_${p.employee_type_id}_${p.financial_year}`,
   );
 
   // ── Access Denied ─────────────────────────────
@@ -262,13 +531,26 @@ export default function LeavePolicy() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+              className="w-8 h-8 text-red-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-1">Access Denied</h2>
-          <p className="text-sm text-gray-500">You don't have permission to view this page.</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-1">
+            Access Denied
+          </h2>
+          <p className="text-sm text-gray-500">
+            You don't have permission to view this page.
+          </p>
           <p className="text-xs text-gray-400 mt-1">Admin access required.</p>
         </div>
       </div>
@@ -277,7 +559,6 @@ export default function LeavePolicy() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-8">
-
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -292,8 +573,18 @@ export default function LeavePolicy() {
           onClick={handleAdd}
           className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           Add Policy
         </button>
@@ -301,18 +592,28 @@ export default function LeavePolicy() {
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-
         <div className="relative flex-1 max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           <input
             type="text"
             placeholder="Search by leave type, employee type or year..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl outline-none
               focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10 transition-all placeholder:text-gray-300"
           />
@@ -321,8 +622,18 @@ export default function LeavePolicy() {
               onClick={() => setSearch("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           )}
@@ -334,30 +645,32 @@ export default function LeavePolicy() {
               onClick={handleBulkDelete}
               className="flex items-center gap-1.5 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-xl transition-all border border-red-200"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
               Delete ({selectedIds.length})
             </button>
           )}
-          <button className="flex items-center gap-2 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 border border-gray-200 px-3.5 py-2.5 rounded-xl transition-all">
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
         </div>
       </div>
 
       {/* ── Table Card ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-
         {selectedIds.length > 0 && (
           <div className="px-6 py-2.5 bg-[#1a2240]/5 border-b border-[#1a2240]/10">
             <span className="text-sm font-medium text-[#1a2240]">
-              {selectedIds.length} polic{selectedIds.length > 1 ? "ies" : "y"} selected
+              {selectedIds.length} polic{selectedIds.length > 1 ? "ies" : "y"}{" "}
+              selected
             </span>
           </div>
         )}
@@ -374,8 +687,17 @@ export default function LeavePolicy() {
                     className="w-4 h-4 rounded border-gray-300 accent-[#1a2240] cursor-pointer"
                   />
                 </th>
-                {["Leave Type", "Employee Type", "No. of Days", "Financial Year", "Actions"].map((col) => (
-                  <th key={col} className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                {[
+                  "Leave Type",
+                  "Employee Type",
+                  "No. of Days",
+                  "Financial Year",
+                  "Actions",
+                ].map((col) => (
+                  <th
+                    key={col}
+                    className="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                  >
                     {col}
                   </th>
                 ))}
@@ -383,129 +705,198 @@ export default function LeavePolicy() {
             </thead>
 
             <tbody className="divide-y divide-gray-50">
-
               {/* Loading */}
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center">
                     <div className="flex items-center justify-center gap-2 text-gray-400">
-                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <svg
+                        className="animate-spin h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                       <span className="text-sm">Loading policies...</span>
                     </div>
                   </td>
                 </tr>
-
               ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
-                      <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg
+                        className="w-10 h-10 opacity-30"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
-                      <p className="text-sm font-medium">No leave policies found</p>
+                      <p className="text-sm font-medium">
+                        No leave policies found
+                      </p>
                       <p className="text-xs">
-                        {search ? "Try adjusting your search" : "Click 'Add Policy' to get started"}
+                        {search
+                          ? "Try adjusting your search"
+                          : "Click 'Add Policy' to get started"}
                       </p>
                     </div>
                   </td>
                 </tr>
+              ) : (
+                paginated.map((policy) => {
+                  const isSelected = selectedIds.includes(policy.id);
+                  const ltLabel =
+                    policy.leave_type_label ||
+                    resolveLabel(policy.type_id, leaveTypes);
+                  const etLabel =
+                    policy.employee_type_label ||
+                    resolveLabel(policy.employee_type_id, employeeTypes);
+                  const fyLabel =
+                    policy.financial_year || getFYLabel(policy.start_date);
 
-              ) : paginated.map((policy) => {
-                const isSelected    = selectedIds.includes(policy.id);
-                const ltLabel       = policy.leave_type_label    || resolveLabel(policy.type_id, leaveTypes);
-                const etLabel       = policy.employee_type_label || resolveLabel(policy.employee_type_id, employeeTypes);
-                const fyLabel       = policy.financial_year      || getFYLabel(policy.start_date);
+                  return (
+                    <tr
+                      key={policy.id}
+                      className={`group transition-colors duration-100 ${
+                        isSelected ? "bg-[#1a2240]/3" : "hover:bg-gray-50/80"
+                      }`}
+                    >
+                      {/* Checkbox */}
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOne(policy.id)}
+                          className="w-4 h-4 rounded border-gray-300 accent-[#1a2240] cursor-pointer"
+                        />
+                      </td>
 
-                return (
-                  <tr
-                    key={policy.id}
-                    className={`group transition-colors duration-100 ${
-                      isSelected ? "bg-[#1a2240]/3" : "hover:bg-gray-50/80"
-                    }`}
-                  >
-                    {/* Checkbox */}
-                    <td className="px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleOne(policy.id)}
-                        className="w-4 h-4 rounded border-gray-300 accent-[#1a2240] cursor-pointer"
-                      />
-                    </td>
-
-                    {/* Leave Type */}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#1a2240]/10 flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-[#1a2240]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
+                      {/* Leave Type */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#1a2240]/10 flex items-center justify-center flex-shrink-0">
+                            <svg
+                              className="w-4 h-4 text-[#1a2240]"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.8}
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                              />
+                            </svg>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-800">
+                            {ltLabel}
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold text-gray-800">{ltLabel}</span>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Employee Type */}
-                    <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 ring-1 ring-violet-200">
-                        {etLabel}
-                      </span>
-                    </td>
+                      {/* Employee Type */}
+                      <td className="px-4 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 ring-1 ring-violet-200">
+                          {etLabel}
+                        </span>
+                      </td>
 
-                    {/* No. of Days */}
-                    <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200">
-                        {policy.no_of_days} days
-                      </span>
-                    </td>
+                      {/* No. of Days */}
+                      <td className="px-4 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200">
+                          {policy.no_of_days} days
+                        </span>
+                      </td>
 
-                    {/* Financial Year */}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="font-medium">{fyLabel}</span>
-                      </div>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1">
-                        <Tooltip text="Edit">
-                          <button
-                            onClick={() => handleEdit(policy)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all duration-150"
+                      {/* Financial Year */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <svg
+                            className="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        </Tooltip>
-                        <Tooltip text="Delete">
-                          <button
-                            onClick={() => handleDeleteClick(policy)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </Tooltip>
-                      </div>
-                    </td>
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.8}
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                          <span className="font-medium">{fyLabel}</span>
+                        </div>
+                      </td>
 
-                  </tr>
-                );
-              })}
+                      {/* Actions */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+                          <Tooltip text="Edit">
+                            <button
+                              onClick={() => handleEdit(policy)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all duration-150"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1.8}
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                            </button>
+                          </Tooltip>
+                          <Tooltip text="Delete">
+                            <button
+                              onClick={() => handleDeleteClick(policy)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1.8}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                            </button>
+                          </Tooltip>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -515,9 +906,12 @@ export default function LeavePolicy() {
           <p className="text-sm text-gray-500">
             Showing{" "}
             <span className="font-medium text-gray-700">
-              {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}
+              {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–
+              {Math.min(currentPage * PAGE_SIZE, filtered.length)}
             </span>{" "}
-            of <span className="font-medium text-gray-700">{filtered.length}</span> policies
+            of{" "}
+            <span className="font-medium text-gray-700">{filtered.length}</span>{" "}
+            policies
           </p>
           <div className="flex items-center gap-1">
             <button
@@ -525,14 +919,29 @@ export default function LeavePolicy() {
               disabled={currentPage === 1}
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
               Prev
             </button>
             {getPageNumbers().map((page, idx) =>
               page === "..." ? (
-                <span key={`e-${idx}`} className="px-2 py-1.5 text-sm text-gray-400">...</span>
+                <span
+                  key={`e-${idx}`}
+                  className="px-2 py-1.5 text-sm text-gray-400"
+                >
+                  ...
+                </span>
               ) : (
                 <button
                   key={page}
@@ -545,7 +954,7 @@ export default function LeavePolicy() {
                 >
                   {page}
                 </button>
-              )
+              ),
             )}
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
@@ -553,8 +962,18 @@ export default function LeavePolicy() {
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               Next
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
           </div>
@@ -584,15 +1003,16 @@ export default function LeavePolicy() {
       {deleteTarget && (
         <DeleteConfirm
           itemName={
-            (deleteTarget.leave_type_label || resolveLabel(deleteTarget.type_id, leaveTypes)) +
+            (deleteTarget.leave_type_label ||
+              resolveLabel(deleteTarget.type_id, leaveTypes)) +
             " — " +
-            (deleteTarget.employee_type_label || resolveLabel(deleteTarget.employee_type_id, employeeTypes))
+            (deleteTarget.employee_type_label ||
+              resolveLabel(deleteTarget.employee_type_id, employeeTypes))
           }
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-
     </div>
   );
 }

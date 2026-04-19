@@ -9,6 +9,13 @@ import { ROLES } from "./config/roles.jsx";
 import Designations from "./pages/Designations.jsx";
 import LeaveTypes from "./pages/LeaveTypes";
 import LeavePolicy from "./pages/LeavePolicy";
+import EmployeeTypes from "./pages/EmployeeTypes";
+import HolidayCalendar from "./pages/HolidayCalendar";
+import AttendancePolicy from "./pages/AttendancePolicy";
+import LeaveManagement from "./pages/LeaveManagement";
+import EmployeeOnboarding from "./pages/EmployeeOnboarding";
+import EmployeeManagement from "./pages/EmployeeManagement";
+import Attendance from "./pages/Attendance";
 
 function DashboardLayout({ page }) {
   const pages = {
@@ -17,6 +24,13 @@ function DashboardLayout({ page }) {
     designation: <Designations />,
     "leave-types": <LeaveTypes />,
     "leave-policy": <LeavePolicy />,
+    "employee-types": <EmployeeTypes />,
+    holidays: <HolidayCalendar />,
+    "attendance-settings": <AttendancePolicy />,
+    "leave-management": <LeaveManagement />,
+    "employee-onboarding": <EmployeeOnboarding />,
+    "employee-management": <EmployeeManagement />,
+    "attendance": <Attendance />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -80,6 +94,66 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <DashboardLayout page="leave-policy" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-types"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <DashboardLayout page="employee-types" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/holidays"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
+            >
+              <DashboardLayout page="holidays" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/attendance-settings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+              <DashboardLayout page="attendance-settings" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leave-management"
+          element={
+            <ProtectedRoute
+              allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
+            >
+              <DashboardLayout page="leave-management" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-onboarding"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+              <DashboardLayout page="employee-onboarding" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee-management"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+              <DashboardLayout page="employee-management" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/attendance"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout page="attendance" />
             </ProtectedRoute>
           }
         />

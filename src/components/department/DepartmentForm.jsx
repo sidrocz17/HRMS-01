@@ -21,7 +21,7 @@ export default function DepartmentForm({
   const [errors, setErrors] = useState({});
   const isEdit = mode === "edit";
 
-  // ── Pre-fill in edit mode ─────────────────────
+  // ── Pre-fill in edit mode ─────────────────────`
   useEffect(() => {
     if (isEdit && initial) {
       setForm({
