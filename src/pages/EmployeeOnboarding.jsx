@@ -12,8 +12,6 @@ import Stepper from "../components/employee_OB/onboarding/Stepper";
 import BasicInfoStep from "../components/employee_OB/onboarding/BasicInfoStep";
 import JobDetailsStep from "../components/employee_OB/onboarding/JobDetailsStep";
 import IdentityStep from "../components/employee_OB/onboarding/IdentityStep";
-import PreviousEmploymentStep from "../components/employee_OB/onboarding/PreviousEmploymentStep";
-import DocumentUploadStep from "../components/employee_OB/onboarding/DocumentUploadStep";
 import ReviewStep from "../components/employee_OB/onboarding/ReviewStep";
 import SuccessModal from "../components/modals/SuccessModal";
 import AssignLeaveModal from "../components/modals/AssignLeaveModal";
@@ -22,9 +20,7 @@ const STEPS = [
   { number: 1, label: "Basic Info" },
   { number: 2, label: "Job Details" },
   { number: 3, label: "Identity" },
-  { number: 4, label: "Previous Work" },
-  { number: 5, label: "Documents" },
-  { number: 6, label: "Review" },
+  { number: 4, label: "Review" },
 ];
 
 const INITIAL_FORM_DATA = {
@@ -48,23 +44,6 @@ const INITIAL_FORM_DATA = {
     pan_num: "",
     aadhar_num: "",
     passport_num: "",
-  },
-  previousEmployment: [
-    {
-      company_name: "",
-      job_title: "",
-      start_date: "",
-      end_date: "",
-      experience_months: 0,
-      reason_for_leaving: "",
-    },
-  ],
-  documents: {
-    pan_card: null,
-    aadhar_card: null,
-    passport: null,
-    offer_letter: null,
-    resume: null,
   },
 };
 
@@ -303,10 +282,6 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.passportNum,
       ),
     },
-    previousEmployment: Array.isArray(employee.previousEmployment)
-      ? employee.previousEmployment
-      : INITIAL_FORM_DATA.previousEmployment,
-    documents: INITIAL_FORM_DATA.documents,
   };
 
   return mapped;
@@ -418,53 +393,6 @@ export default function EmployeeOnboarding() {
     }));
   };
 
-  const handleArrayFieldChange = (section, index, field, value) => {
-    setFormData((prev) => {
-      const newArray = [...prev[section]];
-      newArray[index] = {
-        ...newArray[index],
-        [field]: value,
-      };
-      return {
-        ...prev,
-        [section]: newArray,
-      };
-    });
-  };
-
-  const handleAddEmployment = () => {
-    setFormData((prev) => ({
-      ...prev,
-      previousEmployment: [
-        ...prev.previousEmployment,
-        {
-          company_name: "",
-          job_title: "",
-          start_date: "",
-          end_date: "",
-          experience_months: 0,
-          reason_for_leaving: "",
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveEmployment = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      previousEmployment: prev.previousEmployment.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleFileUpload = (field, file) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: {
-        ...prev.documents,
-        [field]: file,
-      },
-    }));
-  };
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     setEmployeeCredentials(null);
@@ -635,19 +563,7 @@ export default function EmployeeOnboarding() {
           errors.aadhar_num = "Aadhaar must be 12 digits";
         break;
 
-      case 4: // Previous Employment (optional but validate if filled)
-        formData.previousEmployment.forEach((emp, idx) => {
-          if (emp.company_name && !emp.job_title)
-            errors[`job_title_${idx}`] = "Job title required";
-          if (emp.start_date && emp.end_date && emp.start_date > emp.end_date)
-            errors[`end_date_${idx}`] = "End date must be after start date";
-        });
-        break;
-
-      case 5: // Documents (optional)
-        break;
-
-      case 6: // Review (no validation needed)
+      case 4: // Review (no validation needed)
         break;
 
       default:
@@ -879,24 +795,6 @@ export default function EmployeeOnboarding() {
           )}
 
           {step === 4 && (
-            <PreviousEmploymentStep
-              data={formData.previousEmployment}
-              errors={stepErrors}
-              onChange={handleArrayFieldChange}
-              onAdd={handleAddEmployment}
-              onRemove={handleRemoveEmployment}
-            />
-          )}
-
-          {step === 5 && (
-            <DocumentUploadStep
-              data={formData.documents}
-              errors={stepErrors}
-              onFileUpload={handleFileUpload}
-            />
-          )}
-
-          {step === 6 && (
             <ReviewStep formData={formData} employeeTypes={employeeTypes} />
           )}
         </div>
@@ -920,7 +818,7 @@ export default function EmployeeOnboarding() {
               </button>
             )}
 
-            {step < 6 ? (
+            {step < STEPS.length ? (
               <button
                 onClick={handleNext}
                 className="px-5 py-2.5 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm"

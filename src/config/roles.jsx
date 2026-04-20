@@ -110,7 +110,7 @@ export const MENU_CONFIG = {
     {
       label: "Employee Management",
       icon: Icons.onboarding,
-      children: ["Employee Management", "Employee Onboarding"],
+      children: ["Employee Management", "Employee Onboarding", "Offboarding"],
     },
     {
       label: "Admin",
@@ -147,7 +147,7 @@ export const MENU_CONFIG = {
     {
       label: "Employee Management",
       icon: Icons.onboarding,
-      children: ["Employee Management"],
+      children: ["Employee Management", "Offboarding"],
     },
     {
       label: "Leave Management",
@@ -186,6 +186,11 @@ export const MENU_CONFIG = {
     {
       label: "Payroll",
       icon: Icons.payroll,
+      children: [],
+    },
+    {
+      label: "Offboarding",
+      icon: Icons.onboarding,
       children: [],
     },
   ],

@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { MENU_CONFIG, ROLE_META, ROLES } from "../config/roles.jsx";
+import { MENU_CONFIG, ROLE_META, ROLES, normalizeRole } from "../config/roles.jsx";
 import { logoutUser } from "../api/authApi";
 import { clearSession } from "../utils/authStorage";
 
@@ -18,53 +18,50 @@ import { clearSession } from "../utils/authStorage";
 // ──────────────────────────────────────────────
 const ROUTE_MAP = {
   // Top-level
-  "Dashboard":              "/dashboard",
-  "Payroll Management":     "/payroll",
-  "Payroll":                "/payroll",
+  Dashboard: "/dashboard",
+  "Payroll Management": "/payroll",
+  Payroll: "/payroll",
 
   // Employee Management
   "Employee Onboarding": "/employee-onboarding",
-  "Employee Offboarding":   "/employees",
-  "Resignation Requests":   "/employees",
   "Employee Management": "/employee-management",
-
-  // Onboarding & Offboarding (HR label)
-  "Onboarding & Offboarding": "/employees",
+  Offboarding: "/offboarding",
 
   // Leave Management
-  "Apply Leave":        "/leave-management",
-  "My Leaves":          "/leave-management",
-  "Team Leaves":        "/leave-management",
-  "Leave Management":   "/leave-management",
+  "Apply Leave": "/leave-management",
+  "My Leaves": "/leave-management",
+  "Team Leaves": "/leave-management",
+  "Leave Management": "/leave-management",
 
   // My Attendance
-  "Attendance Dashboard":   "/attendance",
-  "Holiday List":           "/holidays",
+  "Attendance Dashboard": "/attendance",
+  "Holiday List": "/holidays",
 
   // Admin
-  "Roles":                  "/roles",
-  "Department":             "/departments",
-  "Designation":            "/designation",
-  "Leave Types":            "/leave-types",
-  "Leave Policy":           "/leave-policy",
+  Roles: "/roles",
+  Department: "/departments",
+  Designation: "/designation",
+  "Leave Types": "/leave-types",
+  "Leave Policy": "/leave-policy",
   "Employee Types": "/employee-types",
 
-  "Company Policies":       "/policies",
-  "Attendance Settings":    "/attendance-settings",
-  "Holiday":                "/holidays",
-  "Holiday Calendar":       "/holidays",
+  "Company Policies": "/policies",
+  "Attendance Settings": "/attendance-settings",
+  Holiday: "/holidays",
+  "Holiday Calendar": "/holidays",
+  "My Profile": "/my-profile",
 
   // Reports
-  "Employee Report":        "/reports/employee",
-  "Attendance Report":      "/reports/attendance",
-  "Performance Report":     "/reports/performance",
+  "Employee Report": "/reports/employee",
+  "Attendance Report": "/reports/attendance",
+  "Performance Report": "/reports/performance",
 };
 
 // ─────────────────────────────────────────────
 
 export default function Sidebar() {
   // ── Read role from localStorage ─────────────
-  const role = localStorage.getItem("role") || ROLES.EMPLOYEE;
+  const role = normalizeRole(localStorage.getItem("role")) || ROLES.EMPLOYEE;
 
   // ── Pick the correct menu for this role ─────
   const navItems = MENU_CONFIG[role] || MENU_CONFIG[ROLES.EMPLOYEE];
@@ -81,13 +78,13 @@ export default function Sidebar() {
   //  so refresh / direct navigation keeps highlight
   const getActiveFromPath = () => {
     const match = Object.entries(ROUTE_MAP).find(
-      ([, path]) => path === location.pathname
+      ([, path]) => path === location.pathname,
     );
     return match ? match[0] : "Dashboard";
   };
 
   const [activeItem, setActiveItem] = useState(getActiveFromPath);
-  const [expanded, setExpanded]     = useState({});
+  const [expanded, setExpanded] = useState({});
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const toggle = (label) =>
@@ -118,20 +115,27 @@ export default function Sidebar() {
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-64 bg-[#1a2240] flex flex-col z-30 overflow-y-auto scrollbar-hide">
-
       {/* ── Logo ── */}
       <div className="flex items-center gap-2 px-5 py-5 border-b border-white/10">
         <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <svg
+            className="w-5 h-5 text-white"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
             <path d="M11 17a1 1 0 001.447.894l4-2A1 1 0 0017 15V9.236a1 1 0 00-1.447-.894l-4 2a1 1 0 00-.553.894V17zM15.211 6.276a1 1 0 000-1.788l-4.764-2.382a1 1 0 00-.894 0L4.789 4.488a1 1 0 000 1.788l4.764 2.382a1 1 0 00.894 0l4.764-2.382zM4.447 8.342A1 1 0 003 9.236V15a1 1 0 00.553.894l4 2A1 1 0 009 17v-5.764a1 1 0 00-.553-.894l-4-2z" />
           </svg>
         </div>
-        <span className="text-white font-bold text-lg tracking-widest">XCELTECH</span>
+        <span className="text-white font-bold text-lg tracking-widest">
+          XCELTECH
+        </span>
       </div>
 
       {/* ── Role badge ── */}
       <div className="px-5 pt-4 pb-1">
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleMeta.badgeClass}`}>
+        <span
+          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleMeta.badgeClass}`}
+        >
           {roleMeta.label}
         </span>
       </div>
@@ -147,7 +151,6 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 pb-4 space-y-0.5">
         {navItems.map((item) => (
           <div key={item.label}>
-
             {/* ── No children → direct link ── */}
             {item.children.length === 0 ? (
               <button
@@ -158,19 +161,28 @@ export default function Sidebar() {
                     : "text-white/70 hover:text-white hover:bg-white/10"
                 }`}
               >
-                <span className={activeItem === item.label ? "text-[#1a2240]" : "text-white/60"}>
+                <span
+                  className={
+                    activeItem === item.label
+                      ? "text-[#1a2240]"
+                      : "text-white/60"
+                  }
+                >
                   {item.icon}
                 </span>
                 {item.label}
                 {activeItem === item.label && (
                   <span className="ml-auto">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 8a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zm6-6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                     </svg>
                   </span>
                 )}
               </button>
-
             ) : (
               /* ── Has children → collapsible section ── */
               <>
@@ -189,7 +201,12 @@ export default function Sidebar() {
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
                     </svg>
                   </span>
                 </button>
@@ -213,7 +230,6 @@ export default function Sidebar() {
                 )}
               </>
             )}
-
           </div>
         ))}
 
@@ -227,7 +243,11 @@ export default function Sidebar() {
           }`}
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+              clipRule="evenodd"
+            />
           </svg>
           My Profile
         </button>
@@ -241,12 +261,15 @@ export default function Sidebar() {
           className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold text-sm py-3 rounded-xl transition-all duration-150"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
+              clipRule="evenodd"
+            />
           </svg>
           {isLoggingOut ? "Logging out..." : "Log Out"}
         </button>
       </div>
-
     </aside>
   );
 }
