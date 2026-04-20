@@ -1,4 +1,6 @@
 // src/components/employee/onboarding/ReviewStep.jsx
+import { ROLES } from "../../../config/roles.jsx";
+
 export default function ReviewStep({ formData, employeeTypes = [] }) {
   const DEPARTMENTS = {
     "1": "Engineering",
@@ -26,6 +28,12 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
   const employeeTypeLabel =
     employeeTypes.find((t) => String(t.id) === String(formData.jobDetails.employee_type_id))
       ?.title || "-";
+  const roleLabel =
+    {
+      [ROLES.ADMIN]: "ADMIN",
+      [ROLES.EMPLOYEE]: "EMPLOYEE",
+      [ROLES.HR]: "HR",
+    }[formData.jobDetails.role] || "-";
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -92,6 +100,7 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
           label="Reporting Manager"
           value={MANAGERS[formData.jobDetails.reporting_manager] || "-"}
         />
+        <Field label="Role" value={roleLabel} />
         <Field
           label="Joining Date"
           value={formatDate(formData.jobDetails.join_date)}

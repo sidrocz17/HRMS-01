@@ -46,6 +46,7 @@ const deriveTodayState = (records = []) => {
     const candidateDate =
       getLocalDateKey(record.inISO) ||
       getLocalDateKey(record.outISO) ||
+      record.dateISO ||
       "";
 
     return candidateDate === todayKey;
@@ -72,7 +73,12 @@ const deriveTodayState = (records = []) => {
   );
 
   return {
-    status: hasCheckedInToday ? STATUS.WORKING : STATUS.NOT_STARTED,
+    status:
+      latestInRecord?.inISO && latestOutRecord?.outISO
+        ? STATUS.COMPLETED
+        : hasCheckedInToday
+        ? STATUS.WORKING
+        : STATUS.NOT_STARTED,
     hasCheckedInToday,
     todayRecord: hasCheckedInToday
       ? {

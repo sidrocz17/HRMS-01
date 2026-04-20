@@ -14,6 +14,7 @@ const EMPTY_FORM = {
 
 export default function ApprovalModal({
   request,      // offboarding record
+  requestType = "resignation",
   submitting,
   apiError,
   onApprove,    // (formData) => void
@@ -29,6 +30,13 @@ export default function ApprovalModal({
   }, [request]);
 
   if (!request) return null;
+
+  const isTermination = requestType === "termination";
+  const requestLabel = isTermination ? "termination" : "resignation";
+  const primaryDateLabel = isTermination ? "Termination Date" : "Resignation Date";
+  const secondaryDateLabel = isTermination
+    ? "Effective Last Working Date"
+    : "Proposed Last Day";
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -105,7 +113,7 @@ export default function ApprovalModal({
           <div>
             <h2 className="text-base font-bold text-gray-900">Take Action</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Review and approve or reject this resignation request
+              {`Review and approve or reject this ${requestLabel} request`}
             </p>
           </div>
           <button
@@ -122,8 +130,18 @@ export default function ApprovalModal({
         {/* ── Request summary ── */}
         <div className="mx-6 mt-5 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 space-y-2.5">
           <DetailRow label="Employee"               value={request.employeeName} />
-          <DetailRow label="Resignation Date"       value={formatDate(request.resignationDate)} />
-          <DetailRow label="Proposed Last Day"      value={formatDate(request.proposedLastWorkingDate)} />
+          <DetailRow
+            label={primaryDateLabel}
+            value={formatDate(isTermination ? request.terminationDate : request.resignationDate)}
+          />
+          <DetailRow
+            label={secondaryDateLabel}
+            value={formatDate(
+              isTermination
+                ? request.finalLastWorkingDate || request.terminationDate
+                : request.proposedLastWorkingDate
+            )}
+          />
           {request.reason && (
             <DetailRow label="Reason" value={request.reason} />
           )}

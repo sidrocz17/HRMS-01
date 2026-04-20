@@ -15,11 +15,22 @@ function formatDate(dateStr) {
 export default function ProfileHeader({ data }) {
   if (!data) return null;
 
-  const fullName    = [data.firstName, data.lastName].filter(Boolean).join(" ") || "—";
-  const initials    = [data.firstName?.[0], data.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
-  const department  = data.department?.deptName  || "—";
-  const designation = data.designation?.title    || "—";
-  const isActive    = data.isActive !== false;
+  const fullName = [data.firstName, data.lastName].filter(Boolean).join(" ") || "—";
+  const initials = [data.firstName?.[0], data.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
+  const department = data.department?.deptName || "—";
+  const designation = data.designation?.title || "—";
+  const employeeType =
+    data.employeeType?.name ||
+    data.employeeType?.typeName ||
+    data.employmentType?.name ||
+    data.employmentType?.typeName ||
+    data.employeeTypeName ||
+    data.employmentTypeName ||
+    data.employeeType ||
+    data.employmentType ||
+    data.typeName ||
+    "—";
+  const isActive = data.isActive !== false;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
@@ -50,6 +61,7 @@ export default function ProfileHeader({ data }) {
             </span>
           </div>
 
+          <p className="text-sm font-medium text-gray-600 mt-1">{employeeType}</p>
           <p className="text-sm text-gray-500 mt-0.5">{designation}</p>
 
           {/* Chips row */}

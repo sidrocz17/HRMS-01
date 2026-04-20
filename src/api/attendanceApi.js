@@ -47,7 +47,19 @@ const isIsoDateLike = (value) =>
   (/^\d{4}-\d{2}-\d{2}T/.test(value) || /^\d{4}-\d{2}-\d{2}$/.test(value));
 
 const isTimeOnly = (value) =>
-  typeof value === "string" && /^\d{2}:\d{2}(:\d{2})?$/.test(value);
+  typeof value === "string" &&
+  /^\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?$/.test(value);
+
+const combineDateAndTime = (dateValue, timeValue) => {
+  const normalizedDate =
+    typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+      ? dateValue
+      : null;
+
+  if (!normalizedDate || !isTimeOnly(timeValue)) return null;
+
+  return `${normalizedDate}T${String(timeValue).trim()}`;
+};
 
 const toIsoString = (value) => {
   if (!value) return null;
@@ -202,12 +214,6 @@ const mapAttendanceRecord = (item = {}, index = 0) => {
       )
     )
   );
-  const inISO = toIsoString(
-    rawInTime
-  );
-  const outISO = toIsoString(
-    rawOutTime
-  );
   const dateValue = firstFilled(
     ...sources.map((source) =>
       firstFilled(
@@ -215,12 +221,12 @@ const mapAttendanceRecord = (item = {}, index = 0) => {
         source.attendanceDate,
         source.attendance_date,
         source.workDate,
-        source.work_date,
-        inISO?.slice(0, 10),
-        outISO?.slice(0, 10)
+        source.work_date
       )
     )
   );
+  const inISO = toIsoString(rawInTime) || combineDateAndTime(dateValue, rawInTime);
+  const outISO = toIsoString(rawOutTime) || combineDateAndTime(dateValue, rawOutTime);
   const employeeName = firstFilled(
     ...sources.map((source) =>
       firstFilled(
@@ -270,6 +276,10 @@ const mapAttendanceRecord = (item = {}, index = 0) => {
       )
     ) || "",
     employeeName: employeeName || "",
+    dateISO:
+      (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+        ? dateValue
+        : inISO?.slice(0, 10) || outISO?.slice(0, 10) || ""),
     date: formatDisplayDate(dateValue),
     inTime: formatDisplayTime(rawInTime || inISO),
     outTime: formatDisplayTime(rawOutTime || outISO),

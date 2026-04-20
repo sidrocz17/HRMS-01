@@ -9,11 +9,13 @@
 import { useState, useEffect } from "react";
 import OffboardingTable from "../components/offboarding/OffboardingTable";
 import ApprovalModal    from "../components/offboarding/ApprovalModal";
+import TerminationTable from "../components/offboarding/TerminationTable";
 import {
   getOffboardingList,
   applyResignation,
   approveRejectOffboarding,
 } from "../api/offboardingApi";
+import { deactivateEmployee } from "../api/employeeManagementApi";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
 
 // ── RBAC helpers ──────────────────────────────
@@ -41,9 +43,44 @@ const EMPTY_APPLY = {
   reason:                 "",
 };
 
+const INITIAL_TERMINATION_REQUESTS = [
+  {
+    terminationId: "term-001",
+    offboardingId: "term-001",
+    empId: "emp-201",
+    employeeName: "Aarav Nanda",
+    terminationDate: "2026-04-24",
+    finalLastWorkingDate: "2026-04-24",
+    reason: "Repeated policy violations",
+    status: "PENDING",
+  },
+  {
+    terminationId: "term-002",
+    offboardingId: "term-002",
+    empId: "emp-202",
+    employeeName: "Megha Roy",
+    terminationDate: "2026-04-10",
+    finalLastWorkingDate: "2026-04-12",
+    reason: "Extended unapproved absence",
+    status: "APPROVED",
+  },
+  {
+    terminationId: "term-003",
+    offboardingId: "term-003",
+    empId: "emp-203",
+    employeeName: "Nitin Sahu",
+    terminationDate: "2026-04-15",
+    finalLastWorkingDate: null,
+    reason: "Role redundancy after restructuring",
+    status: "REJECTED",
+  },
+];
+
 // ── View Detail Modal (EMPLOYEE + resolved records) ─
-function ViewModal({ record, onClose }) {
+function ViewModal({ record, requestType = "resignation", onClose }) {
   if (!record) return null;
+
+  const isTermination = requestType === "termination";
 
   const handleBackdrop = (e) => {
     if (e.target === e.currentTarget) onClose();
@@ -70,8 +107,20 @@ function ViewModal({ record, onClose }) {
         <div className="px-6 py-5 space-y-3">
           {[
             { label: "Employee",              value: record.employeeName },
-            { label: "Resignation Date",      value: formatDate(record.resignationDate) },
-            { label: "Proposed Last Day",     value: formatDate(record.proposedLastWorkingDate) },
+            {
+              label: isTermination ? "Termination Date" : "Resignation Date",
+              value: formatDate(
+                isTermination ? record.terminationDate : record.resignationDate
+              ),
+            },
+            {
+              label: isTermination ? "Effective Last Day" : "Proposed Last Day",
+              value: formatDate(
+                isTermination
+                  ? record.finalLastWorkingDate || record.terminationDate
+                  : record.proposedLastWorkingDate
+              ),
+            },
             { label: "Final Last Day",        value: formatDate(record.finalLastWorkingDate) || "Not set" },
             { label: "Status",               value: record.status },
             { label: "Reason",               value: record.reason },
@@ -111,7 +160,9 @@ export default function Offboarding() {
   const empId       = getEmpId();
 
   // ── State ─────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("resignation-requests");
   const [offboardingList, setOffboardingList] = useState([]);
+  const [terminationList, setTerminationList] = useState(INITIAL_TERMINATION_REQUESTS);
   const [loading, setLoading]                 = useState(false);
   const [apiError, setApiError]               = useState("");
 
@@ -124,11 +175,13 @@ export default function Offboarding() {
 
   // ── Approval modal (HR/ADMIN) ──────────────────
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [selectedRequestType, setSelectedRequestType] = useState("resignation");
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [actionApiError, setActionApiError]    = useState("");
 
   // ── View modal (all roles) ─────────────────────
   const [viewRecord, setViewRecord]           = useState(null);
+  const [viewRequestType, setViewRequestType] = useState("resignation");
 
   // ── Load list ──────────────────────────────────
   useEffect(() => {
@@ -218,28 +271,64 @@ export default function Offboarding() {
     setActionSubmitting(true);
     setActionApiError("");
     try {
-      const response = await approveRejectOffboarding(
-        selectedRequest.offboardingId,
-        actionPayload
-      );
-      console.log("✅ Action taken:", response);
+      const normalizedActionStatus = String(actionPayload.status || "").trim().toUpperCase();
 
-      // Update local list
-      setOffboardingList((prev) =>
-        prev.map((r) =>
-          r.offboardingId === selectedRequest.offboardingId
-            ? {
-                ...r,
-                status:               response.status,
-                finalLastWorkingDate: response.finalLastWorkingDate || actionPayload.finalLastWorkingDate,
-                feedback:             actionPayload.feedback,
-                isGoodToRehire:       actionPayload.isGoodToRehire,
-              }
-            : r
-        )
-      );
+      if (selectedRequestType === "termination") {
+        setTerminationList((prev) =>
+          prev.map((record) =>
+            record.offboardingId === selectedRequest.offboardingId
+              ? {
+                  ...record,
+                  status: actionPayload.status,
+                  finalLastWorkingDate:
+                    actionPayload.finalLastWorkingDate ||
+                    record.finalLastWorkingDate,
+                  feedback: actionPayload.feedback,
+                  isGoodToRehire: actionPayload.isGoodToRehire,
+                }
+              : record
+          )
+        );
+      } else {
+        const response = await approveRejectOffboarding(
+          selectedRequest.offboardingId,
+          actionPayload
+        );
+        console.log("✅ Action taken:", response);
+
+        if (normalizedActionStatus === "APPROVED") {
+          const targetEmpId =
+            selectedRequest.empId ||
+            selectedRequest.employeeId ||
+            response?.empId ||
+            response?.employeeId ||
+            "";
+
+          if (!targetEmpId) {
+            throw new Error("Employee ID missing for deactivation.");
+          }
+
+          await deactivateEmployee(targetEmpId);
+          console.log("✅ Employee deactivated:", targetEmpId);
+        }
+
+        setOffboardingList((prev) =>
+          prev.map((r) =>
+            r.offboardingId === selectedRequest.offboardingId
+              ? {
+                  ...r,
+                  status:               response.status,
+                  finalLastWorkingDate: response.finalLastWorkingDate || actionPayload.finalLastWorkingDate,
+                  feedback:             actionPayload.feedback,
+                  isGoodToRehire:       actionPayload.isGoodToRehire,
+                }
+              : r
+          )
+        );
+      }
 
       setSelectedRequest(null);
+      setSelectedRequestType("resignation");
     } catch (err) {
       console.error("❌ Action failed:", err);
       setActionApiError(
@@ -290,13 +379,15 @@ export default function Offboarding() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {isAdminOrHR
-              ? "Review and manage employee resignation requests"
+              ? activeTab === "termination-requests"
+                ? "Review and manage employee termination requests"
+                : "Review and manage employee resignation requests"
               : "Submit and track your resignation request"}
           </p>
         </div>
 
         {/* Employee: apply resignation button */}
-        {!isAdminOrHR && (
+        {!isAdminOrHR && activeTab === "resignation-requests" && (
           <button
             onClick={() => {
               setApplyForm(EMPTY_APPLY);
@@ -343,17 +434,69 @@ export default function Offboarding() {
         </div>
       )}
 
-      {/* ── Table ── */}
-      <OffboardingTable
-        data={offboardingList}
-        isAdminOrHR={isAdminOrHR}
-        loading={loading}
-        onTakeAction={(record) => {
-          setSelectedRequest(record);
-          setActionApiError("");
-        }}
-        onView={(record) => setViewRecord(record)}
-      />
+      {/* ── Tabs ── */}
+      <div className="mb-6 border-b border-gray-200">
+        <div className="flex items-center gap-8">
+          <button
+            onClick={() => setActiveTab("resignation-requests")}
+            className={`pb-3 text-sm font-medium border-b-2 transition-all ${
+              activeTab === "resignation-requests"
+                ? "text-[#1a2240] border-[#1a2240]"
+                : "text-gray-500 border-transparent hover:text-gray-700"
+            }`}
+          >
+            Resignation Requests
+          </button>
+
+          {isAdminOrHR && (
+            <button
+              onClick={() => setActiveTab("termination-requests")}
+              className={`pb-3 text-sm font-medium border-b-2 transition-all ${
+                activeTab === "termination-requests"
+                  ? "text-[#1a2240] border-[#1a2240]"
+                  : "text-gray-500 border-transparent hover:text-gray-700"
+              }`}
+            >
+              Termination Requests
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Resignation Requests ── */}
+      {activeTab === "resignation-requests" && (
+        <OffboardingTable
+          data={offboardingList}
+          isAdminOrHR={isAdminOrHR}
+          loading={loading}
+          onTakeAction={(record) => {
+            setSelectedRequest(record);
+            setSelectedRequestType("resignation");
+            setActionApiError("");
+          }}
+          onView={(record) => {
+            setViewRecord(record);
+            setViewRequestType("resignation");
+          }}
+        />
+      )}
+
+      {/* ── Termination Requests ── */}
+      {activeTab === "termination-requests" && isAdminOrHR && (
+        <TerminationTable
+          data={terminationList}
+          loading={false}
+          onTakeAction={(record) => {
+            setSelectedRequest(record);
+            setSelectedRequestType("termination");
+            setActionApiError("");
+          }}
+          onView={(record) => {
+            setViewRecord(record);
+            setViewRequestType("termination");
+          }}
+        />
+      )}
 
       {/* ════════════════════════════════════════════
           MODALS
@@ -486,6 +629,7 @@ export default function Offboarding() {
       {selectedRequest && (
         <ApprovalModal
           request={selectedRequest}
+          requestType={selectedRequestType}
           submitting={actionSubmitting}
           apiError={actionApiError}
           onApprove={handleAction}
@@ -493,6 +637,7 @@ export default function Offboarding() {
           onClose={() => {
             if (!actionSubmitting) {
               setSelectedRequest(null);
+              setSelectedRequestType("resignation");
               setActionApiError("");
             }
           }}
@@ -503,7 +648,11 @@ export default function Offboarding() {
       {viewRecord && (
         <ViewModal
           record={viewRecord}
-          onClose={() => setViewRecord(null)}
+          requestType={viewRequestType}
+          onClose={() => {
+            setViewRecord(null);
+            setViewRequestType("resignation");
+          }}
         />
       )}
 

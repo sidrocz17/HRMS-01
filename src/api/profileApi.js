@@ -14,6 +14,16 @@ const authHeaders = () => ({
   },
 });
 
+const normalizeProfileResponse = (responseData) => {
+  if (responseData?.data && typeof responseData.data === "object") {
+    return responseData.data;
+  }
+  if (responseData?.employee && typeof responseData.employee === "object") {
+    return responseData.employee;
+  }
+  return responseData;
+};
+
 // ── Helper: resolve logged-in employee ID ──────
 export const getLoggedInEmpId = () => {
   try {
@@ -37,32 +47,11 @@ export const getLoggedInEmpId = () => {
 //   panNum, aadharNum, passportNum, joinDate,
 //   reportingManager, isActive, noticePeriod }
 export const getProfile = async (empId) => {
-  // TODO: integrate API
-  // const response = await axios.get(
-  //   buildApiUrl(`/employees/${empId}`),
-  //   authHeaders()
-  // );
-  // return response.data;
-
-  // ── Placeholder mock ──────────────────────────
-  console.log("📤 GET /employees/:empId →", empId);
-  return {
-    empId:             empId || "emp-001",
-    firstName:         "Aman",
-    lastName:          "Verma",
-    email:             "aman.verma@xceltech.in",
-    phone:             "9876543210",
-    address:           "12, MG Road, Bangalore, Karnataka – 560001",
-    department:        { deptName: "Engineering" },
-    designation:       { title: "Senior Engineer" },
-    panNum:            "ABCDE1234F",
-    aadharNum:         "123456789012",
-    passportNum:       "P1234567",
-    joinDate:          "2022-06-15",
-    reportingManager:  null,
-    isActive:          true,
-    noticePeriod:      60,
-  };
+  const response = await axios.get(
+    buildApiUrl(`/employees/${empId}`),
+    authHeaders()
+  );
+  return normalizeProfileResponse(response.data);
 };
 
 // ── PUT /employees/:empId ─────────────────────

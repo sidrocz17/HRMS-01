@@ -15,6 +15,7 @@ import IdentityStep from "../components/employee_OB/onboarding/IdentityStep";
 import ReviewStep from "../components/employee_OB/onboarding/ReviewStep";
 import SuccessModal from "../components/modals/SuccessModal";
 import AssignLeaveModal from "../components/modals/AssignLeaveModal";
+import { normalizeRole, ROLES } from "../config/roles.jsx";
 
 const STEPS = [
   { number: 1, label: "Basic Info" },
@@ -35,6 +36,7 @@ const INITIAL_FORM_DATA = {
     dept_id: "",
     desig_id: "",
     employee_type_id: "",
+    role: ROLES.EMPLOYEE,
     reporting_manager: "",
     join_date: "",
     offer_letter_num: "",
@@ -101,6 +103,8 @@ const nullIfEmpty = (value) => {
 
 const transformPayload = (data, userId) => {
   const employeeTypeId = data.jobDetails.employee_type_id || null;
+  const normalizedRole = normalizeRole(data.jobDetails.role);
+
   return {
     firstName: data.basicInfo.first_name.trim(),
     lastName: data.basicInfo.last_name.trim(),
@@ -110,8 +114,6 @@ const transformPayload = (data, userId) => {
     deptId: data.jobDetails.dept_id,
     designationId: data.jobDetails.desig_id,
     employmentTypeId: employeeTypeId,
-    employeeTypeId: employeeTypeId,
-    empTypeId: employeeTypeId,
     panNum: data.identity.pan_num.trim(),
     aadharNum: data.identity.aadhar_num.trim(),
     passportNum: nullIfEmpty(data.identity.passport_num),
@@ -120,6 +122,7 @@ const transformPayload = (data, userId) => {
     noticePeriod: Number(data.jobDetails.notice_period),
     createdBy: userId,
     reportingManager: null,
+    role: normalizedRole.toUpperCase(),
   };
 };
 
@@ -246,6 +249,9 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.employment_type_id,
         employee.empTypeId,
         employee.emp_type_id,
+      ),
+      role: normalizeRole(
+        firstFilledValue(employee.role, employee.user_role, employee.userRole),
       ),
       reporting_manager: firstFilledValue(
         employee.reporting_manager,
@@ -545,6 +551,7 @@ export default function EmployeeOnboarding() {
           errors.desig_id = "Designation required";
         if (!formData.jobDetails.employee_type_id)
           errors.employee_type_id = "Employee type required";
+        if (!formData.jobDetails.role) errors.role = "Role required";
         if (!formData.jobDetails.join_date)
           errors.join_date = "Joining date required";
         if (!formData.jobDetails.notice_period)
