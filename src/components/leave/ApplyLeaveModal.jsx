@@ -16,6 +16,22 @@ const EMPTY_FORM = {
   reason: "",
 };
 
+const calculateLeaveDays = ({ from_date, to_date, type_of_day }) => {
+  if (!from_date || !to_date) return 0;
+
+  const from = new Date(from_date);
+  const to = new Date(to_date);
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    return 0;
+  }
+
+  const diffTime = Math.abs(to - from);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  return type_of_day === "half" ? 0.5 : diffDays;
+};
+
 export default function ApplyLeaveModal({
   onSubmit,
   onClose,
@@ -26,14 +42,8 @@ export default function ApplyLeaveModal({
 
   // ── Calculate days ────────────────────────────
   useEffect(() => {
-    if (form.from_date && form.to_date) {
-      const from = new Date(form.from_date);
-      const to = new Date(form.to_date);
-      const diffTime = Math.abs(to - from);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-      setForm((prev) => ({ ...prev, days: diffDays }));
-    }
+    const nextDays = calculateLeaveDays(form);
+    setForm((prev) => (prev.days === nextDays ? prev : { ...prev, days: nextDays }));
   }, [form.from_date, form.to_date, form.type_of_day]);
 
   const handleChange = (field, value) => {
@@ -57,11 +67,14 @@ export default function ApplyLeaveModal({
 
   const handleSubmit = () => {
     if (!validate()) return;
+
+    const requestedDays = calculateLeaveDays(form);
+
     onSubmit({
       empLeaveId: form.emp_leave_id,
       leaveDay: form.type_of_day === "half" ? "HALF" : "FULL",
       description: form.reason,
-      noOfDays: form.days,
+      noOfDays: requestedDays,
       startDate: form.from_date,
       endDate: form.to_date,
     });

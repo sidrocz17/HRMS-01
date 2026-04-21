@@ -35,6 +35,17 @@ export const applyResignation = async (payload) => {
   return response.data;
 };
 
+// ── POST /offboarding/termination ────────────
+// Payload: { empId, terminationDate, reason, feedback, isGoodToRehire }
+export const initiateTermination = async (payload) => {
+  const response = await axios.post(
+    buildApiUrl("/offboarding/termination"),
+    payload,
+    authHeaders()
+  );
+  return response.data;
+};
+
 // ── POST /offboarding/resignation/:id/action ──
 // Payload: { status, finalLastWorkingDate, feedback, isGoodToRehire }
 // Response: { offboardingId, employeeName, status, finalLastWorkingDate }
@@ -64,5 +75,14 @@ export const getOffboardingList = async (status) => {
     : buildApiUrl("/offboarding/resignation");
 
   const response = await axios.get(path, authHeaders());
+  return normalizeListResponse(response.data);
+};
+
+// ── GET /offboarding/termination ─────────────
+export const getTerminationList = async () => {
+  const response = await axios.get(
+    buildApiUrl("/offboarding/termination"),
+    authHeaders()
+  );
   return normalizeListResponse(response.data);
 };

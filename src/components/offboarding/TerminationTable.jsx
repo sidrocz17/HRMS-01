@@ -56,7 +56,7 @@ export default function TerminationTable({
   onView,
 }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("PENDING");
+  const [statusFilter, setStatusFilter] = useState("APPROVED");
   const [currentPage, setCurrentPage] = useState(1);
 
   const filtered = useMemo(

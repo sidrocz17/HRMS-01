@@ -12,10 +12,13 @@ import ApprovalModal    from "../components/offboarding/ApprovalModal";
 import TerminationTable from "../components/offboarding/TerminationTable";
 import {
   getOffboardingList,
+  getTerminationList,
   applyResignation,
   approveRejectOffboarding,
+  initiateTermination,
 } from "../api/offboardingApi";
 import { deactivateEmployee } from "../api/employeeManagementApi";
+import { getEmployees } from "../api/employeeManagementApi";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
 
 // ── RBAC helpers ──────────────────────────────
@@ -43,38 +46,108 @@ const EMPTY_APPLY = {
   reason:                 "",
 };
 
-const INITIAL_TERMINATION_REQUESTS = [
-  {
-    terminationId: "term-001",
-    offboardingId: "term-001",
-    empId: "emp-201",
-    employeeName: "Aarav Nanda",
-    terminationDate: "2026-04-24",
-    finalLastWorkingDate: "2026-04-24",
-    reason: "Repeated policy violations",
-    status: "PENDING",
-  },
-  {
-    terminationId: "term-002",
-    offboardingId: "term-002",
-    empId: "emp-202",
-    employeeName: "Megha Roy",
-    terminationDate: "2026-04-10",
-    finalLastWorkingDate: "2026-04-12",
-    reason: "Extended unapproved absence",
-    status: "APPROVED",
-  },
-  {
-    terminationId: "term-003",
-    offboardingId: "term-003",
-    empId: "emp-203",
-    employeeName: "Nitin Sahu",
-    terminationDate: "2026-04-15",
-    finalLastWorkingDate: null,
-    reason: "Role redundancy after restructuring",
-    status: "REJECTED",
-  },
-];
+const EMPTY_TERMINATION_FORM = {
+  empId: "",
+  employeeName: "",
+  terminationDate: "",
+  reason: "",
+  feedback: "",
+  isGoodToRehire: false,
+};
+
+const pickEmployeeList = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.employees)) return payload.employees;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+const normalizeEmployeeOption = (employee = {}) => {
+  const empId =
+    employee.emp_id ||
+    employee.employee_id ||
+    employee.empId ||
+    employee.employeeId ||
+    employee.id ||
+    "";
+  const firstName =
+    employee.first_name || employee.firstName || employee.firstname || "";
+  const lastName =
+    employee.last_name || employee.lastName || employee.lastname || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return {
+    empId: String(empId || ""),
+    employeeName:
+      fullName ||
+      employee.employeeName ||
+      employee.name ||
+      employee.email ||
+      "Unknown Employee",
+    email: employee.email || employee.email_id || employee.work_email || "",
+    isActive:
+      typeof employee.is_active === "boolean"
+        ? employee.is_active
+        : typeof employee.isActive === "boolean"
+        ? employee.isActive
+        : typeof employee.status === "string"
+        ? employee.status.toLowerCase() === "active"
+        : true,
+  };
+};
+
+const normalizeTerminationRecord = (record = {}, fallback = {}) => ({
+  terminationId:
+    record.terminationId ||
+    record.termination_id ||
+    record.offboardingId ||
+    record.offboarding_id ||
+    fallback.terminationId ||
+    fallback.offboardingId ||
+    fallback.empId ||
+    "",
+  offboardingId:
+    record.offboardingId ||
+    record.offboarding_id ||
+    record.terminationId ||
+    record.termination_id ||
+    fallback.offboardingId ||
+    fallback.terminationId ||
+    fallback.empId ||
+    "",
+  empId:
+    record.empId ||
+    record.emp_id ||
+    record.employeeId ||
+    record.employee_id ||
+    fallback.empId ||
+    "",
+  employeeName:
+    record.employeeName ||
+    record.employee_name ||
+    fallback.employeeName ||
+    "—",
+  terminationDate:
+    record.terminationDate ||
+    record.termination_date ||
+    fallback.terminationDate ||
+    "",
+  finalLastWorkingDate:
+    record.finalLastWorkingDate ||
+    record.final_last_working_date ||
+    fallback.finalLastWorkingDate ||
+    null,
+  reason: record.reason || fallback.reason || "",
+  feedback: record.feedback || fallback.feedback || "",
+  isGoodToRehire:
+    typeof record.isGoodToRehire === "boolean"
+      ? record.isGoodToRehire
+      : typeof fallback.isGoodToRehire === "boolean"
+      ? fallback.isGoodToRehire
+      : false,
+  status: record.status || fallback.status || "PENDING",
+});
 
 // ── View Detail Modal (EMPLOYEE + resolved records) ─
 function ViewModal({ record, requestType = "resignation", onClose }) {
@@ -162,7 +235,7 @@ export default function Offboarding() {
   // ── State ─────────────────────────────────────
   const [activeTab, setActiveTab] = useState("resignation-requests");
   const [offboardingList, setOffboardingList] = useState([]);
-  const [terminationList, setTerminationList] = useState(INITIAL_TERMINATION_REQUESTS);
+  const [terminationList, setTerminationList] = useState([]);
   const [loading, setLoading]                 = useState(false);
   const [apiError, setApiError]               = useState("");
 
@@ -172,6 +245,16 @@ export default function Offboarding() {
   const [applyErrors, setApplyErrors]         = useState({});
   const [applySubmitting, setApplySubmitting] = useState(false);
   const [applyApiError, setApplyApiError]     = useState("");
+  const [showTerminationModal, setShowTerminationModal] = useState(false);
+  const [terminationForm, setTerminationForm] = useState(
+    EMPTY_TERMINATION_FORM
+  );
+  const [terminationErrors, setTerminationErrors] = useState({});
+  const [terminationSubmitting, setTerminationSubmitting] = useState(false);
+  const [terminationApiError, setTerminationApiError] = useState("");
+  const [terminationEmployeeSearch, setTerminationEmployeeSearch] = useState("");
+  const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [employeeOptionsLoading, setEmployeeOptionsLoading] = useState(false);
 
   // ── Approval modal (HR/ADMIN) ──────────────────
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -192,13 +275,24 @@ export default function Offboarding() {
     setLoading(true);
     setApiError("");
     try {
-      const data = await getOffboardingList();
-      const normalizedData = Array.isArray(data) ? data : [];
+      const [resignationData, terminationData] = await Promise.all([
+        getOffboardingList(),
+        isAdminOrHR ? getTerminationList() : Promise.resolve([]),
+      ]);
+      const normalizedData = Array.isArray(resignationData)
+        ? resignationData
+        : [];
+      const normalizedTerminationData = (Array.isArray(terminationData)
+        ? terminationData
+        : []
+      ).map((record) => normalizeTerminationRecord(record));
+
       setOffboardingList(
         isAdminOrHR
           ? normalizedData
           : normalizedData.filter((record) => String(record.empId || "") === String(empId || ""))
       );
+      setTerminationList(normalizedTerminationData);
     } catch (err) {
       console.error("❌ Failed to load offboarding list:", err);
       setApiError(
@@ -208,6 +302,28 @@ export default function Offboarding() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEmployeeOptions = async () => {
+    if (employeeOptionsLoading || employeeOptions.length > 0) return;
+
+    setEmployeeOptionsLoading(true);
+    try {
+      const response = await getEmployees();
+      const normalized = pickEmployeeList(response)
+        .map(normalizeEmployeeOption)
+        .filter((employee) => employee.empId && employee.isActive);
+      setEmployeeOptions(normalized);
+    } catch (err) {
+      console.error("❌ Failed to load employees for termination:", err);
+      setTerminationApiError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load employees."
+      );
+    } finally {
+      setEmployeeOptionsLoading(false);
     }
   };
 
@@ -261,6 +377,88 @@ export default function Offboarding() {
       );
     } finally {
       setApplySubmitting(false);
+    }
+  };
+
+  const validateTermination = () => {
+    const errs = {};
+
+    if (!terminationForm.empId) errs.empId = "Employee is required.";
+    if (!terminationForm.terminationDate)
+      errs.terminationDate = "Termination date is required.";
+    if (!terminationForm.reason.trim()) errs.reason = "Reason is required.";
+    if (!terminationForm.feedback.trim())
+      errs.feedback = "Feedback is required.";
+
+    setTerminationErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleTerminationChange = (field, value) => {
+    setTerminationForm((prev) => ({ ...prev, [field]: value }));
+    if (terminationErrors[field]) {
+      setTerminationErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const openTerminationModal = async () => {
+    setTerminationForm(EMPTY_TERMINATION_FORM);
+    setTerminationErrors({});
+    setTerminationApiError("");
+    setTerminationEmployeeSearch("");
+    setShowTerminationModal(true);
+    await loadEmployeeOptions();
+  };
+
+  const closeTerminationModal = () => {
+    if (terminationSubmitting) return;
+    setShowTerminationModal(false);
+  };
+
+  const handleEmployeeSelect = (employee) => {
+    setTerminationForm((prev) => ({
+      ...prev,
+      empId: employee.empId,
+      employeeName: employee.employeeName,
+    }));
+    setTerminationEmployeeSearch(employee.employeeName);
+    setTerminationErrors((prev) => ({ ...prev, empId: "" }));
+  };
+
+  const handleInitiateTermination = async () => {
+    if (!validateTermination()) return;
+
+    setTerminationSubmitting(true);
+    setTerminationApiError("");
+    try {
+      const payload = {
+        empId: terminationForm.empId,
+        terminationDate: terminationForm.terminationDate,
+        reason: terminationForm.reason.trim(),
+        feedback: terminationForm.feedback.trim(),
+        isGoodToRehire: terminationForm.isGoodToRehire,
+      };
+
+      const response = await initiateTermination(payload);
+      const createdRecord = normalizeTerminationRecord(response, {
+        ...payload,
+        employeeName: terminationForm.employeeName,
+        status: "PENDING",
+      });
+
+      setTerminationList((prev) => [createdRecord, ...prev]);
+      setShowTerminationModal(false);
+      setTerminationForm(EMPTY_TERMINATION_FORM);
+      setTerminationEmployeeSearch("");
+    } catch (err) {
+      console.error("❌ Termination initiation failed:", err);
+      setTerminationApiError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to initiate termination."
+      );
+    } finally {
+      setTerminationSubmitting(false);
     }
   };
 
@@ -367,6 +565,38 @@ export default function Offboarding() {
       </p>
     ) : null;
 
+  const terminationInputCls = (field) =>
+    `w-full px-4 py-2.5 text-sm border rounded-xl outline-none transition-all
+    placeholder:text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed
+    ${
+      terminationErrors[field]
+        ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+        : "border-gray-200 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
+    }`;
+
+  const TerminationErrMsg = ({ field }) =>
+    terminationErrors[field] ? (
+      <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clipRule="evenodd"
+          />
+        </svg>
+        {terminationErrors[field]}
+      </p>
+    ) : null;
+
+  const filteredEmployeeOptions = employeeOptions
+    .filter((employee) =>
+      employee.employeeName
+        .toLowerCase()
+        .includes(terminationEmployeeSearch.toLowerCase())
+    )
+    .slice(0, 8);
+  const combinedRequests = [...offboardingList, ...terminationList];
+
   // ─────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-8">
@@ -403,6 +633,18 @@ export default function Offboarding() {
             Apply Resignation
           </button>
         )}
+
+        {isAdminOrHR && (
+          <button
+            onClick={openTerminationModal}
+            className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Initiate Termination
+          </button>
+        )}
       </div>
 
       {/* ── Global error ── */}
@@ -421,10 +663,10 @@ export default function Offboarding() {
       {isAdminOrHR && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Total",    value: offboardingList.length,                                      color: "bg-[#1a2240]/10 text-[#1a2240]" },
-            { label: "Pending",  value: offboardingList.filter((r) => r.status === "PENDING").length,  color: "bg-amber-50 text-amber-700" },
-            { label: "Approved", value: offboardingList.filter((r) => r.status === "APPROVED").length, color: "bg-emerald-50 text-emerald-700" },
-            { label: "Rejected", value: offboardingList.filter((r) => r.status === "REJECTED").length, color: "bg-red-50 text-red-600" },
+            { label: "Total",    value: combinedRequests.length,                                      color: "bg-[#1a2240]/10 text-[#1a2240]" },
+            { label: "Pending",  value: combinedRequests.filter((r) => r.status === "PENDING").length,  color: "bg-amber-50 text-amber-700" },
+            { label: "Approved", value: combinedRequests.filter((r) => r.status === "APPROVED").length, color: "bg-emerald-50 text-emerald-700" },
+            { label: "Rejected", value: combinedRequests.filter((r) => r.status === "REJECTED").length, color: "bg-red-50 text-red-600" },
           ].map(({ label, value, color }) => (
             <div key={label} className={`rounded-2xl px-5 py-4 shadow-sm ${color} bg-white border border-gray-100`}>
               <p className="text-3xl font-bold leading-none">{value}</p>
@@ -621,6 +863,239 @@ export default function Offboarding() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── Initiate Termination Modal (HR / ADMIN) ── */}
+      {showTerminationModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !terminationSubmitting) {
+              closeTerminationModal();
+            }
+          }}
+        >
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">
+                  Initiate Termination
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Search and select an employee, then submit termination details
+                </p>
+              </div>
+              <button
+                onClick={closeTerminationModal}
+                disabled={terminationSubmitting}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Search Employee <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-3 w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search employee name..."
+                    value={terminationEmployeeSearch}
+                    onChange={(e) => {
+                      setTerminationEmployeeSearch(e.target.value);
+                      if (terminationForm.empId) {
+                        setTerminationForm((prev) => ({
+                          ...prev,
+                          empId: "",
+                          employeeName: "",
+                        }));
+                      }
+                    }}
+                    disabled={terminationSubmitting}
+                    className={`${terminationInputCls("empId")} pl-9`}
+                  />
+                </div>
+                <div className="mt-2 border border-gray-200 rounded-xl max-h-52 overflow-y-auto bg-gray-50/50">
+                  {employeeOptionsLoading ? (
+                    <div className="px-4 py-3 text-sm text-gray-500">
+                      Loading employees...
+                    </div>
+                  ) : filteredEmployeeOptions.length > 0 ? (
+                    filteredEmployeeOptions.map((employee) => (
+                      <button
+                        key={employee.empId}
+                        type="button"
+                        onClick={() => handleEmployeeSelect(employee)}
+                        className={`w-full px-4 py-3 text-left hover:bg-white transition-colors border-b last:border-b-0 border-gray-100 ${
+                          terminationForm.empId === employee.empId
+                            ? "bg-white"
+                            : ""
+                        }`}
+                      >
+                        <p className="text-sm font-medium text-gray-800">
+                          {employee.employeeName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {employee.email || employee.empId}
+                        </p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-gray-500">
+                      No employees found.
+                    </div>
+                  )}
+                </div>
+                {terminationForm.empId && (
+                  <p className="mt-2 text-xs text-emerald-700">
+                    Selected employee ID: {terminationForm.empId}
+                  </p>
+                )}
+                <TerminationErrMsg field="empId" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Termination Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={terminationForm.terminationDate}
+                  onChange={(e) =>
+                    handleTerminationChange("terminationDate", e.target.value)
+                  }
+                  disabled={terminationSubmitting}
+                  className={terminationInputCls("terminationDate")}
+                />
+                <TerminationErrMsg field="terminationDate" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter termination reason..."
+                  value={terminationForm.reason}
+                  onChange={(e) =>
+                    handleTerminationChange("reason", e.target.value)
+                  }
+                  disabled={terminationSubmitting}
+                  className={`${terminationInputCls("reason")} resize-none`}
+                />
+                <TerminationErrMsg field="reason" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Feedback <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Enter feedback..."
+                  value={terminationForm.feedback}
+                  onChange={(e) =>
+                    handleTerminationChange("feedback", e.target.value)
+                  }
+                  disabled={terminationSubmitting}
+                  className={`${terminationInputCls("feedback")} resize-none`}
+                />
+                <TerminationErrMsg field="feedback" />
+              </div>
+
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">
+                    Eligible for Rehire
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {terminationForm.isGoodToRehire
+                      ? "Employee can be rehired in the future"
+                      : "Employee is not eligible for rehire"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleTerminationChange(
+                      "isGoodToRehire",
+                      !terminationForm.isGoodToRehire
+                    )
+                  }
+                  disabled={terminationSubmitting}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
+                    terminationForm.isGoodToRehire
+                      ? "bg-emerald-500"
+                      : "bg-gray-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${
+                      terminationForm.isGoodToRehire
+                        ? "translate-x-6"
+                        : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {terminationApiError && (
+              <div className="px-6 pb-2">
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2.5 rounded-xl">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {terminationApiError}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <button
+                onClick={closeTerminationModal}
+                disabled={terminationSubmitting}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInitiateTermination}
+                disabled={terminationSubmitting}
+                className={`px-5 py-2 text-sm font-semibold text-white rounded-xl transition-all shadow-sm ${
+                  terminationSubmitting
+                    ? "bg-[#1a2240]/60 cursor-not-allowed"
+                    : "bg-[#1a2240] hover:bg-[#243055] active:scale-95"
+                }`}
+              >
+                {terminationSubmitting ? "Submitting..." : "Create Termination"}
+              </button>
+            </div>
           </div>
         </div>
       )}

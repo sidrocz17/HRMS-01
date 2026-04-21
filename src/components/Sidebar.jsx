@@ -8,7 +8,12 @@
 
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { MENU_CONFIG, ROLE_META, ROLES, normalizeRole } from "../config/roles.jsx";
+import {
+  MENU_CONFIG,
+  ROLE_META,
+  ROLES,
+  normalizeRole,
+} from "../config/roles.jsx";
 import { logoutUser } from "../api/authApi";
 import { clearSession } from "../utils/authStorage";
 
@@ -52,9 +57,8 @@ const ROUTE_MAP = {
   "My Profile": "/my-profile",
 
   // Reports
-  "Employee Report": "/reports/employee",
-  "Attendance Report": "/reports/attendance",
-  "Performance Report": "/reports/performance",
+  "Employee Leave Report": "/reports/employee",
+  "Employee Attendance Report": "/reports/attendance",
 };
 
 // ─────────────────────────────────────────────

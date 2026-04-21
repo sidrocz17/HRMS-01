@@ -133,7 +133,7 @@ export const MENU_CONFIG = {
     {
       label: "Reports",
       icon: Icons.reports,
-      children: ["Employee Report", "Attendance Report", "Performance Report"],
+      children: ["Employee Leave Report", "Employee Attendance Report"],
     },
   ],
 
@@ -162,7 +162,7 @@ export const MENU_CONFIG = {
     {
       label: "Reports",
       icon: Icons.reports,
-      children: ["Employee Report", "Attendance Report"],
+      children: ["Employee Leave Report", "Employee Attendance Report"],
     },
   ],
 
