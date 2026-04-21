@@ -1,8 +1,8 @@
 // src/pages/AttendanceReports.jsx
 // ─────────────────────────────────────────────
 //  Attendance Reports — HR / ADMIN only
-//  Uses existing getAllAttendance() from attendanceApi.js
-//  All filtering is client-side on fetched data
+//  Uses date-based getAllAttendance(date) from attendanceApi.js
+//  All secondary filtering is client-side on fetched data
 // ─────────────────────────────────────────────
 
 import { useState, useEffect, useMemo } from "react";
@@ -15,8 +15,18 @@ import { getAllAttendance } from "../api/attendanceApi";
 // ── Working-hours threshold for LATE detection ─
 const LATE_IN_TIME_24H = "09:30"; // any punch-in after this = Late
 
+const pad = (value) => String(value).padStart(2, "0");
+
+const getTodayDate = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+};
+
 // ── Derive attendance status from record ───────
 function deriveStatus(record) {
+  const apiStatus = String(record.status || "").trim().toUpperCase();
+  if (apiStatus) return apiStatus;
+
   if (!record.inTime || record.inTime === "—") return "ABSENT";
   // Convert 12-hr display time → comparable string
   // inTime from your existing API is already formatted as "HH:MM AM/PM"
@@ -62,28 +72,32 @@ function SummaryCard({ label, value, color, sub }) {
 
 // ─────────────────────────────────────────────
 export default function AttendanceReports() {
+  const todayDate = getTodayDate();
+
   // ── Raw data ───────────────────────────────────
-  const [rawData, setRawData]   = useState([]);
-  const [loading, setLoading]   = useState(false);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
 
   // ── Filters ────────────────────────────────────
-  const [search, setSearch]             = useState("");
+  const [search, setSearch] = useState("");
   const [filterValues, setFilterValues] = useState({
     employee: "",
     status:   "",
-    dateFrom: "",
-    dateTo:   "",
+    dateFrom: todayDate,
   });
 
-  // ── Load all attendance once on mount ─────────
+  // ── Load attendance when main date changes ────
   useEffect(() => {
     const load = async () => {
+      const apiDate = filterValues.dateFrom || todayDate;
+
       setLoading(true);
       setApiError("");
       try {
-        const data = await getAllAttendance();
-        const raw  = Array.isArray(data) ? data : [];
+        const data = await getAllAttendance(apiDate);
+        const raw = Array.isArray(data) ? data : [];
 
         // Attach derived status
         const normalized = raw.map((r, i) => ({
@@ -92,52 +106,61 @@ export default function AttendanceReports() {
           status: deriveStatus(r),
         }));
 
-        setRawData(normalized);
+        setAttendanceData(normalized);
       } catch (err) {
         console.error("❌ Attendance report load failed:", err);
+        setAttendanceData([]);
         setApiError(err?.response?.data?.message || err?.message || "Failed to load attendance data.");
       } finally {
         setLoading(false);
       }
     };
+
     load();
-  }, []);
+  }, [filterValues.dateFrom, todayDate]);
+
+  // ── Client-side filter ─────────────────────────
+  useEffect(() => {
+    const nextFilteredData = attendanceData.filter((r) => {
+      const q = search.toLowerCase().trim();
+      const employeeName = String(r.employeeName || "");
+      const rowDate = r.dateISO || r.inISO?.slice(0, 10) || r.outISO?.slice(0, 10) || "";
+
+      if (
+        q &&
+        !employeeName.toLowerCase().includes(q) &&
+        !String(r.date || "").toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+
+      if (filterValues.employee && employeeName !== filterValues.employee) return false;
+      if (filterValues.status && r.status !== filterValues.status) return false;
+      if (filterValues.dateFrom && rowDate && rowDate !== filterValues.dateFrom) return false;
+
+      return true;
+    });
+
+    setFilteredData(nextFilteredData);
+  }, [attendanceData, search, filterValues]);
 
   // ── Unique employee options ────────────────────
   const employeeOptions = useMemo(() => {
-    const names = [...new Set(rawData.map((r) => r.employeeName).filter(Boolean))];
+    const names = [...new Set(attendanceData.map((r) => r.employeeName).filter(Boolean))];
     return names.map((n) => ({ value: n, label: n }));
-  }, [rawData]);
-
-  // ── Client-side filter ─────────────────────────
-  const filtered = useMemo(() => {
-    return rawData.filter((r) => {
-      const q = search.toLowerCase();
-      if (q && !String(r.employeeName || "").toLowerCase().includes(q) &&
-               !String(r.date || "").toLowerCase().includes(q)) return false;
-      if (filterValues.employee && r.employeeName !== filterValues.employee) return false;
-      if (filterValues.status   && r.status       !== filterValues.status)   return false;
-      // Date range — r.date is formatted "DD Mon YYYY", parse via ISO from inISO when available
-      if (filterValues.dateFrom || filterValues.dateTo) {
-        const rowDate = r.inISO ? r.inISO.slice(0, 10) : "";
-        if (filterValues.dateFrom && rowDate && rowDate < filterValues.dateFrom) return false;
-        if (filterValues.dateTo   && rowDate && rowDate > filterValues.dateTo)   return false;
-      }
-      return true;
-    });
-  }, [rawData, search, filterValues]);
+  }, [attendanceData]);
 
   // ── Summary from filtered data ─────────────────
   const summary = useMemo(() => ({
-    total:   filtered.length,
-    present: filtered.filter((r) => r.status === "PRESENT").length,
-    absent:  filtered.filter((r) => r.status === "ABSENT").length,
-    late:    filtered.filter((r) => r.status === "LATE").length,
-  }), [filtered]);
+    total:   filteredData.length,
+    present: filteredData.filter((r) => r.status === "PRESENT").length,
+    absent:  filteredData.filter((r) => r.status === "ABSENT").length,
+    late:    filteredData.filter((r) => r.status === "LATE").length,
+  }), [filteredData]);
 
   // ── Average working hours (present days only) ──
   const avgHours = useMemo(() => {
-    const presentRows = filtered.filter((r) => r.status === "PRESENT" && r.workingHours && r.workingHours !== "—");
+    const presentRows = filteredData.filter((r) => r.status === "PRESENT" && r.workingHours && r.workingHours !== "—");
     if (!presentRows.length) return "—";
     const total = presentRows.reduce((sum, r) => {
       // workingHours format: "Xh YYm"
@@ -147,7 +170,7 @@ export default function AttendanceReports() {
     }, 0);
     const avgMin = Math.round(total / presentRows.length);
     return `${Math.floor(avgMin / 60)}h ${String(avgMin % 60).padStart(2, "0")}m`;
-  }, [filtered]);
+  }, [filteredData]);
 
   // ── Filter config ──────────────────────────────
   const filterConfig = [
@@ -167,8 +190,7 @@ export default function AttendanceReports() {
         { value: "LATE",    label: "Late"    },
       ],
     },
-    { key: "dateFrom", label: "From Date", type: "date" },
-    { key: "dateTo",   label: "To Date",   type: "date" },
+    { key: "dateFrom", label: "Select Date", type: "date" },
   ];
 
   // ── Table columns ──────────────────────────────
@@ -231,11 +253,17 @@ export default function AttendanceReports() {
 
   const handleReset = () => {
     setSearch("");
-    setFilterValues({ employee: "", status: "", dateFrom: "", dateTo: "" });
+    setFilterValues({ employee: "", status: "", dateFrom: todayDate });
   };
 
   const handleExport = () =>
-    exportToCSV(filtered, `attendance-report-${new Date().toISOString().slice(0, 10)}.csv`);
+    exportToCSV(filteredData, `attendance-report-${(filterValues.dateFrom || todayDate)}.csv`);
+
+  const handleToday = () =>
+    setFilterValues((prev) => ({
+      ...prev,
+      dateFrom: todayDate,
+    }));
 
   // ─────────────────────────────────────────────
   return (
@@ -243,10 +271,21 @@ export default function AttendanceReports() {
 
       {/* ── Page header ── */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Attendance Reports</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          View and export attendance records across all employees
-        </p>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Attendance Reports</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              View and export attendance records across all employees
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleToday}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50"
+          >
+            Today
+          </button>
+        </div>
       </div>
 
       {/* ── Global error ── */}
@@ -278,11 +317,11 @@ export default function AttendanceReports() {
         onChange={handleFilterChange}
         onReset={handleReset}
         onExport={handleExport}
-        resultCount={filtered.length}
+        resultCount={filteredData.length}
       />
 
       {/* ── Table ── */}
-      <ReportsTable columns={columns} data={filtered} loading={loading} />
+      <ReportsTable columns={columns} data={filteredData} loading={loading} />
 
     </div>
   );

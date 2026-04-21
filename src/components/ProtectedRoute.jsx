@@ -10,11 +10,10 @@
 // ─────────────────────────────────────────────
 
 import { Navigate } from "react-router-dom";
-import { normalizeRole } from "../config/roles.jsx";
+import { getUserFromToken } from "../utils/auth.js";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const token = localStorage.getItem("token");
-  const role  = normalizeRole(localStorage.getItem("role"));
+  const { token, role } = getUserFromToken();
 
   // ── 1. Not logged in → go to login ──────────
   if (!token) {

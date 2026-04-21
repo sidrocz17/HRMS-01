@@ -6,10 +6,11 @@
 
 import axios from "axios";
 import { buildApiUrl } from "./apiBase";
+import { getEmpIdFromToken, getToken } from "../utils/auth.js";
 
 const authHeaders = () => ({
   headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
+    Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
   },
 });
@@ -26,18 +27,7 @@ const normalizeProfileResponse = (responseData) => {
 
 // ── Helper: resolve logged-in employee ID ──────
 export const getLoggedInEmpId = () => {
-  try {
-    const user        = JSON.parse(localStorage.getItem("user")        || "{}");
-    const userDetails = JSON.parse(localStorage.getItem("userDetails") || "{}");
-    return (
-      localStorage.getItem("employeeId") ||
-      user.employeeId  || user.empId  || user.emp_id  ||
-      userDetails.empId || userDetails.emp_id || userDetails.employeeId ||
-      user.id          || ""
-    );
-  } catch {
-    return localStorage.getItem("employeeId") || "";
-  }
+  return getEmpIdFromToken();
 };
 
 // ── GET /employees/:empId ─────────────────────

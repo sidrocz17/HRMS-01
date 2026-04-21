@@ -3,10 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
 import { buildUrl } from "../api/apiBase";
-import {
-  fetchLoggedInUserContext,
-  getEmployeeIdentity,
-} from "../api/userApi";
+import { getUserFromToken } from "../utils/auth.js";
 
 const NetworkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -57,8 +54,7 @@ export default function XcelTechSplitLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const role  = normalizeRole(localStorage.getItem("role"));
+    const { token, role } = getUserFromToken();
     if (token && role) {
       navigate(ROLE_REDIRECT[role] || "/dashboard", { replace: true });
     }
@@ -93,125 +89,12 @@ export default function XcelTechSplitLogin() {
         throw new Error("Token missing in login response");
       }
       localStorage.setItem("token", token);
-      localStorage.removeItem("userDetails");
-      localStorage.removeItem("employeeId");
-      localStorage.removeItem("userId");
+      localStorage.removeItem("auth_token");
 
-      const userRole = normalizeRole(data.role || data.user?.role || "admin");
-      localStorage.setItem("role", userRole);
-
-      const sessionUser = {
-        id:        data.id || data.user?.id || data.userId || data.user?.userId || data.uuid || data.user?.uuid || data.employeeId || data.user?.employeeId || data.empId || data.user?.empId,
-        userId:    data.userId || data.user?.userId || data.id || data.user?.id,
-        uuid:      data.uuid || data.user?.uuid,
-        employeeId: data.employeeId || data.user?.employeeId || data.empId || data.user?.empId,
-        firstName: data.firstName || data.user?.firstName,
-        lastName:  data.lastName || data.user?.lastName,
-        userName:  data.userName || data.username || data.user?.userName || data.user?.username || username,
-        username:  data.username || data.user?.username || data.userName || data.user?.userName || username,
-        email:     data.email || data.user?.email || data.username || data.user?.username,
-        image:     data.image || data.user?.image,
-        role:      userRole,
-      };
-
-      localStorage.setItem("user", JSON.stringify(sessionUser));
-      if (sessionUser.userId) {
-        localStorage.setItem("userId", String(sessionUser.userId));
-      }
-
-      // Fetch and cache logged-in user details and employee mapping
-      try {
-        const cachedUser = JSON.parse(localStorage.getItem("user") || "{}");
-        const { user: details, userId: resolvedUserId, employee, employeeId } =
-          await fetchLoggedInUserContext({
-          userId: cachedUser.userId || cachedUser.id || cachedUser.uuid,
-          employeeId: cachedUser.employeeId || cachedUser.empId,
-          userName: username,
-          username: cachedUser.username || cachedUser.userName || username,
-          email: cachedUser.email,
-        });
-
-        if (details) {
-          const derivedEmpId =
-            employeeId ||
-            getEmployeeIdentity(employee || {}) ||
-            details.empId ||
-            details.emp_id ||
-            details.employeeId ||
-            details.employee_id ||
-            cachedUser.employeeId ||
-            cachedUser.empId ||
-            cachedUser.emp_id ||
-            null;
-
-          const mergedUserDetails = {
-            ...details,
-            ...(employee && typeof employee === "object"
-              ? {
-                  employee,
-                }
-              : {}),
-            ...(derivedEmpId
-              ? {
-                  employeeId: String(derivedEmpId),
-                  empId: String(derivedEmpId),
-                }
-              : {}),
-          };
-
-          localStorage.setItem("userDetails", JSON.stringify(mergedUserDetails));
-          if (derivedEmpId) {
-            localStorage.setItem("employeeId", String(derivedEmpId));
-          }
-          if (resolvedUserId) {
-            localStorage.setItem("userId", String(resolvedUserId));
-          }
-          localStorage.setItem(
-            "user",
-            JSON.stringify({
-              ...cachedUser,
-              userId:
-                resolvedUserId ||
-                cachedUser.userId ||
-                details.userId ||
-                details.user_id ||
-                details.uuid ||
-                cachedUser.id,
-              ...(derivedEmpId
-                ? {
-                    employeeId: String(derivedEmpId),
-                    empId: String(derivedEmpId),
-                  }
-                : {}),
-              userName:
-                details.userName ??
-                details.username ??
-                cachedUser.userName ??
-                cachedUser.username ??
-                username,
-              username:
-                details.username ??
-                details.userName ??
-                cachedUser.username ??
-                cachedUser.userName ??
-                username,
-              email:
-                details.email ??
-                details.username ??
-                cachedUser.email ??
-                cachedUser.username,
-              firstName: details.firstName ?? cachedUser.firstName,
-              lastName: details.lastName ?? cachedUser.lastName,
-              isActive: details.isActive ?? details.active ?? cachedUser.isActive,
-              active: details.active ?? details.isActive ?? cachedUser.active,
-              createdAt: details.createdAt ?? cachedUser.createdAt,
-              updatedAt: details.updatedAt ?? cachedUser.updatedAt,
-            })
-          );
-        }
-      } catch (e) {
-        console.error("❌ Failed to fetch /api/users context:", e);
-      }
+      const tokenUser = getUserFromToken();
+      const userRole = normalizeRole(
+        tokenUser.role || data.role || data.user?.role || "admin"
+      );
 
       const redirectPath = ROLE_REDIRECT[userRole] || "/dashboard";
       navigate(redirectPath, { replace: true });

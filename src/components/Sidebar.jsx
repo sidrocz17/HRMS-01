@@ -12,10 +12,10 @@ import {
   MENU_CONFIG,
   ROLE_META,
   ROLES,
-  normalizeRole,
 } from "../config/roles.jsx";
 import { logoutUser } from "../api/authApi";
 import { clearSession } from "../utils/authStorage";
+import { getRoleFromToken } from "../utils/auth.js";
 
 // ── Route map — label → path ───────────────────
 //  Add new pages here as your project grows.
@@ -63,9 +63,8 @@ const ROUTE_MAP = {
 
 // ─────────────────────────────────────────────
 
-export default function Sidebar() {
-  // ── Read role from localStorage ─────────────
-  const role = normalizeRole(localStorage.getItem("role")) || ROLES.EMPLOYEE;
+export default function Sidebar({ isOpen = true }) {
+  const role = getRoleFromToken() || ROLES.EMPLOYEE;
 
   // ── Pick the correct menu for this role ─────
   const navItems = MENU_CONFIG[role] || MENU_CONFIG[ROLES.EMPLOYEE];
@@ -118,7 +117,11 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="fixed top-0 left-0 h-screen w-64 bg-[#1a2240] flex flex-col z-30 overflow-y-auto scrollbar-hide">
+    <aside
+      className={`fixed top-0 left-0 h-screen w-64 bg-[#1a2240] flex flex-col z-30 overflow-y-auto scrollbar-hide transition-transform duration-300 ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       {/* ── Logo ── */}
       <div className="flex items-center gap-2 px-5 py-5 border-b border-white/10">
         <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -22,6 +23,8 @@ import LeaveReports from "./pages/LeaveReports";
 import AttendanceReports from "./pages/AttendanceReports";
 
 function DashboardLayout({ page }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   const pages = {
     dashboard: <Dashboard />,
     departments: <Departments />,
@@ -45,9 +48,12 @@ function DashboardLayout({ page }) {
 
   return (
     <div className="flex min-h-screen bg-slate-100">
-      <Sidebar />
-      <div className="flex-1 ml-64">
-        <Navbar />
+      <Sidebar isOpen={sidebarOpen} />
+      <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
+        <Navbar
+          isSidebarOpen={sidebarOpen}
+          onMenuToggle={() => setSidebarOpen((prev) => !prev)}
+        />
         <div className="pt-16">{pages[page] || <Dashboard />}</div>
       </div>
     </div>

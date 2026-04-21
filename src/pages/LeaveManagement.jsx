@@ -22,6 +22,7 @@ import {
 } from "../api/leaveApi";
 import { fetchLeaveTypes } from "../api/leaveTypeApi";
 import { formatDisplayDate } from "../utils/date";
+import { getUserFromToken } from "../utils/auth.js";
 
 // ── RBAC Config ───────────────────────────────
 const ROLES = {
@@ -63,30 +64,6 @@ const mapLeaveBalanceItem = (item = {}, index = 0) => ({
   used: item.usedLeaves ?? item.used ?? 0,
   remaining: item.remainingLeaves ?? item.remaining ?? 0,
 });
-
-const getLoggedInEmployeeId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const userDetails = JSON.parse(localStorage.getItem("userDetails") || "{}");
-
-    return (
-      localStorage.getItem("employeeId") ||
-      user.employeeId ||
-      user.empId ||
-      user.emp_id ||
-      user.id ||
-      userDetails.empId ||
-      userDetails.emp_id ||
-      userDetails.employeeId ||
-      userDetails.employee_id ||
-      userDetails.id ||
-      user.uuid ||
-      ""
-    );
-  } catch {
-    return localStorage.getItem("employeeId") || "";
-  }
-};
 
 const normalizeLeaveBalance = (response) =>
   toArray(response)
@@ -212,8 +189,7 @@ const normalizeTeamLeaves = (response) =>
 
 export default function LeaveManagement() {
   // ── RBAC ──────────────────────────────────────
-  const role = localStorage.getItem("role") || ROLES.EMPLOYEE;
-  const loggedInEmployeeId = getLoggedInEmployeeId();
+  const { role, empId: loggedInEmployeeId } = getUserFromToken();
   const hasEmployeeId = Boolean(String(loggedInEmployeeId || "").trim());
 
   // ── State ─────────────────────────────────────

@@ -10,7 +10,7 @@ import { useHolidays }   from "../components/holiday/useHolidays";
 import HolidayForm       from "../components/holiday/HolidayForm";
 import DeleteConfirm     from "../components/holiday/DeleteConfirm";
 import { HOLIDAY_TYPES, getYearOptions } from "../api/holidayApi";
-import { normalizeRole } from "../config/roles.jsx";
+import { getRoleFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 10;
 
@@ -67,7 +67,7 @@ const getDaysUntil = (dateStr) => {
 
 export default function HolidayCalendar() {
   // ── RBAC ──────────────────────────────────────
-  const role = normalizeRole(localStorage.getItem("role"));
+  const role = getRoleFromToken();
   const canManage = role === "admin" || role === "hr";
 
   // ── Year ──────────────────────────────────────

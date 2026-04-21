@@ -7,12 +7,29 @@
 
 import { useState } from "react";
 
+const getDateOfBirth = (data) =>
+  data?.dateOfBirth || data?.date_of_birth || data?.dob || "";
+
+const formatDisplayDate = (value) => {
+  if (!value) return "—";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 export default function PersonalInfo({ data, onSave, saving = false }) {
   const [editing, setEditing]   = useState(false);
   const [form, setForm]         = useState({});
   const [errors, setErrors]     = useState({});
 
   const fullName = [data?.firstName, data?.lastName].filter(Boolean).join(" ") || "—";
+  const dateOfBirth = formatDisplayDate(getDateOfBirth(data));
 
   const handleEdit = () => {
     setForm({
@@ -91,6 +108,7 @@ export default function PersonalInfo({ data, onSave, saving = false }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ReadField label="Full Name" value={fullName} />
               <ReadField label="Email"     value={data?.email} />
+              <ReadField label="Date of Birth" value={dateOfBirth} />
             </div>
 
             {/* Editable: Phone */}
@@ -166,6 +184,7 @@ export default function PersonalInfo({ data, onSave, saving = false }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
             <ReadField label="Full Name" value={fullName}      />
             <ReadField label="Email"     value={data?.email}   />
+            <ReadField label="Date of Birth" value={dateOfBirth} />
             <ReadField label="Phone"     value={data?.phone}   />
             <ReadField label="Address"   value={data?.address} fullWidth />
           </div>

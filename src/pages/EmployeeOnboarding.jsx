@@ -16,6 +16,7 @@ import ReviewStep from "../components/employee_OB/onboarding/ReviewStep";
 import SuccessModal from "../components/modals/SuccessModal";
 import AssignLeaveModal from "../components/modals/AssignLeaveModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
+import { getUserFromToken } from "../utils/auth.js";
 
 const STEPS = [
   { number: 1, label: "Basic Info" },
@@ -31,6 +32,7 @@ const INITIAL_FORM_DATA = {
     email: "",
     phone: "",
     address: "",
+    date_of_birth: "",
   },
   jobDetails: {
     dept_id: "",
@@ -49,51 +51,8 @@ const INITIAL_FORM_DATA = {
   },
 };
 
-const decodeJwtPayload = (token) => {
-  try {
-    const [, payload = ""] = token.split(".");
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
-
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
-};
-
 const getStoredUserId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
-    const tokenPayload = token ? decodeJwtPayload(token) : null;
-
-    return (
-      user.id ||
-      user.userId ||
-      user.uuid ||
-      user.employeeId ||
-      user.empId ||
-      user.user_id ||
-      tokenPayload?.userId ||
-      tokenPayload?.id ||
-      tokenPayload?.sub ||
-      tokenPayload?.uid ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uuid") ||
-      localStorage.getItem("employeeId") ||
-      ""
-    );
-  } catch {
-    return (
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uuid") ||
-      localStorage.getItem("employeeId") ||
-      ""
-    );
-  }
+  return getUserFromToken().userId || "";
 };
 
 const nullIfEmpty = (value) => {
@@ -111,6 +70,7 @@ const transformPayload = (data, userId) => {
     email: data.basicInfo.email.trim(),
     phone: data.basicInfo.phone.trim(),
     address: data.basicInfo.address.trim(),
+    dateOfBirth: data.basicInfo.date_of_birth,
     deptId: data.jobDetails.dept_id,
     designationId: data.jobDetails.desig_id,
     employmentTypeId: employeeTypeId,
@@ -224,6 +184,13 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.mobile_num,
       ),
       address: firstFilledValue(employee.address, employee.current_address),
+      date_of_birth: toInputDate(
+        firstFilledValue(
+          employee.date_of_birth,
+          employee.dateOfBirth,
+          employee.dob,
+        ),
+      ),
     },
     jobDetails: {
       dept_id: firstFilledValue(
@@ -542,6 +509,8 @@ export default function EmployeeOnboarding() {
           errors.phone = "Invalid phone (10 digits)";
         if (!formData.basicInfo.address.trim())
           errors.address = "Address required";
+        if (!formData.basicInfo.date_of_birth)
+          errors.date_of_birth = "Date of birth required";
         break;
 
       case 2: // Job Details

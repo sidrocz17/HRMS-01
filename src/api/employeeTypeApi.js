@@ -2,45 +2,11 @@
 
 import httpClient from "./httpClient";
 import { BASE_URL } from "./apiBase";
-
-const decodeJwtPayload = (token) => {
-  try {
-    const [, payload = ""] = token.split(".");
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "="
-    );
-
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
-};
+import { getUserIdFromToken } from "../utils/auth";
 
 // ── Get logged-in user ID from localStorage ───
 const getUserId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
-    const tokenPayload = token ? decodeJwtPayload(token) : null;
-
-    return (
-      user.id ||
-      user.userId ||
-      user.uuid ||
-      user.employeeId ||
-      user.empId ||
-      user.user_id ||
-      tokenPayload?.userId ||
-      tokenPayload?.id ||
-      tokenPayload?.sub ||
-      tokenPayload?.uid ||
-      ""
-    );
-  } catch {
-    return "";
-  }
+  return getUserIdFromToken();
 };
 
 // ── POST /api/employment-type ─────────────────

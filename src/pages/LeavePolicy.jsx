@@ -19,6 +19,7 @@ import {
   fetchLeaveTypes,
   fetchEmployeeTypes,
 } from "../api/leavePolicyApi";
+import { getRoleFromToken, getUserIdFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 8;
 
@@ -150,43 +151,8 @@ const mapPolicyItem = (d = {}) => ({
     "",
 });
 
-const decodeJwtPayload = (token) => {
-  try {
-    const [, payload = ""] = token.split(".");
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
-
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
-};
-
 const getCreatedBy = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
-    const tokenPayload = token ? decodeJwtPayload(token) : null;
-
-    return (
-      user.id ||
-      user.userId ||
-      user.uuid ||
-      user.employeeId ||
-      user.empId ||
-      user.user_id ||
-      tokenPayload?.userId ||
-      tokenPayload?.id ||
-      tokenPayload?.sub ||
-      tokenPayload?.uid ||
-      ""
-    );
-  } catch {
-    return "";
-  }
+  return getUserIdFromToken();
 };
 
 const getFinancialYearDates = (financialYear) => {
@@ -215,7 +181,7 @@ const getFinancialYearDates = (financialYear) => {
 
 export default function LeavePolicy() {
   // ── RBAC ──────────────────────────────────────
-  const role = localStorage.getItem("role") || "";
+  const role = getRoleFromToken();
 
   // ── Data state ────────────────────────────────
   const [policies, setPolicies] = useState([]);

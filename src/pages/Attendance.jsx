@@ -15,6 +15,7 @@ import {
   punchOut,
   getAttendance,
 } from "../api/attendanceApi";
+import { getRoleFromToken } from "../utils/auth.js";
 
 // ── Status constants ──────────────────────────
 const STATUS = {
@@ -142,7 +143,7 @@ function Toast({ message, type, onDone }) {
 // ─────────────────────────────────────────────
 export default function Attendance() {
   // ── RBAC ──────────────────────────────────────
-  const role = localStorage.getItem("role") || "employee";
+  const role = getRoleFromToken();
   const isAdminOrHR = role === "admin" || role === "hr";
   const isEmployee = role === "employee";
 

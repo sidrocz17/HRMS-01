@@ -14,6 +14,7 @@ import {
   deleteLeaveType,
   fetchLeaveTypes,
 } from "../api/leaveTypeApi";
+import { getRoleFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 8;
 
@@ -78,8 +79,7 @@ const Tooltip = ({ text, children }) => (
 
 export default function LeaveTypes() {
   // ── RBAC check ────────────────────────────────
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const role = localStorage.getItem("role") || user?.role || "";
+  const role = getRoleFromToken();
 
   // ── Data state ────────────────────────────────
   const [leaveTypes, setLeaveTypes]   = useState([]);

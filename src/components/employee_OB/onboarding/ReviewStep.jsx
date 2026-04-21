@@ -82,6 +82,10 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
         />
         <Field label="Email" value={formData.basicInfo.email} />
         <Field label="Phone" value={formData.basicInfo.phone} />
+        <Field
+          label="Date of Birth"
+          value={formatDate(formData.basicInfo.date_of_birth)}
+        />
         <Field label="Address" value={formData.basicInfo.address} />
       </Section>
 

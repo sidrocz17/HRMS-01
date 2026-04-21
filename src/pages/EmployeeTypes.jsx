@@ -15,6 +15,7 @@ import {
   fetchEmployeeTypes,
   updateEmployeeType,
 } from "../api/employeeTypeApi";
+import { getRoleFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 8;
 
@@ -53,7 +54,7 @@ const formatDate = (iso) => {
 
 export default function EmployeeTypes() {
   // ── RBAC ──────────────────────────────────────
-  const role = localStorage.getItem("role") || "";
+  const role = getRoleFromToken();
 
   // ── Data state ────────────────────────────────
   // Each item shape: { id, name, isActive, createdOn }

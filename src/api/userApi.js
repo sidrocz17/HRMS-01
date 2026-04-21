@@ -1,9 +1,10 @@
 import axios from "axios";
 import { buildApiUrl } from "./apiBase";
+import { getToken } from "../utils/auth";
 
 const authHeaders = () => ({
   headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
+    Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
   },
 });

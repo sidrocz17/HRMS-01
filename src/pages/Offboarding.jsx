@@ -15,29 +15,18 @@ import {
   getTerminationList,
   applyResignation,
   approveRejectOffboarding,
+  approveRejectTermination,
   initiateTermination,
 } from "../api/offboardingApi";
 import { deactivateEmployee } from "../api/employeeManagementApi";
 import { getEmployees } from "../api/employeeManagementApi";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
+import { getEmpIdFromToken, getRoleFromToken } from "../utils/auth.js";
 
 // ── RBAC helpers ──────────────────────────────
-const getRole = () => normalizeRole(localStorage.getItem("role")) || ROLES.EMPLOYEE;
+const getRole = () => normalizeRole(getRoleFromToken()) || ROLES.EMPLOYEE;
 
-const getEmpId = () => {
-  try {
-    const user        = JSON.parse(localStorage.getItem("user")        || "{}");
-    const userDetails = JSON.parse(localStorage.getItem("userDetails") || "{}");
-    return (
-      localStorage.getItem("employeeId") ||
-      user.employeeId  || user.empId  || user.emp_id  ||
-      userDetails.empId || userDetails.emp_id || userDetails.employeeId ||
-      user.id          || ""
-    );
-  } catch {
-    return localStorage.getItem("employeeId") || "";
-  }
-};
+const getEmpId = () => getEmpIdFromToken();
 
 // ── Apply Resignation form initial state ───────
 const EMPTY_APPLY = {
@@ -472,17 +461,49 @@ export default function Offboarding() {
       const normalizedActionStatus = String(actionPayload.status || "").trim().toUpperCase();
 
       if (selectedRequestType === "termination") {
+        const response = await approveRejectTermination(
+          selectedRequest.offboardingId,
+          actionPayload
+        );
+        const resolvedTerminationStatus = String(
+          response?.status || normalizedActionStatus
+        )
+          .trim()
+          .toUpperCase();
+
+        if (resolvedTerminationStatus === "APPROVED") {
+          const targetEmpId =
+            selectedRequest.empId ||
+            selectedRequest.employeeId ||
+            response?.empId ||
+            response?.employeeId ||
+            "";
+
+          if (!targetEmpId) {
+            throw new Error("Employee ID missing for deactivation.");
+          }
+
+          await deactivateEmployee(targetEmpId);
+          console.log("✅ Employee deactivated:", targetEmpId);
+        }
+
         setTerminationList((prev) =>
           prev.map((record) =>
             record.offboardingId === selectedRequest.offboardingId
               ? {
                   ...record,
-                  status: actionPayload.status,
+                  status: resolvedTerminationStatus,
                   finalLastWorkingDate:
+                    response?.finalLastWorkingDate ||
                     actionPayload.finalLastWorkingDate ||
                     record.finalLastWorkingDate,
-                  feedback: actionPayload.feedback,
-                  isGoodToRehire: actionPayload.isGoodToRehire,
+                  feedback:
+                    response?.feedback ??
+                    actionPayload.feedback,
+                  isGoodToRehire:
+                    typeof response?.isGoodToRehire === "boolean"
+                      ? response.isGoodToRehire
+                      : actionPayload.isGoodToRehire,
                 }
               : record
           )

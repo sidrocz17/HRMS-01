@@ -46,7 +46,7 @@ export const initiateTermination = async (payload) => {
   return response.data;
 };
 
-// ── POST /offboarding/resignation/:id/action ──
+// ── PUT /offboarding/resignation/:id/action ───
 // Payload: { status, finalLastWorkingDate, feedback, isGoodToRehire }
 // Response: { offboardingId, employeeName, status, finalLastWorkingDate }
 export const approveRejectOffboarding = async (offboardingId, payload) => {
@@ -60,6 +60,18 @@ export const approveRejectOffboarding = async (offboardingId, payload) => {
   // TODO: After APPROVED → deactivate employee & user
   //   await axios.put(buildApiUrl(`/employees/${empId}/status`),
   //     { is_active: false, user_active: false }, authHeaders());
+};
+
+// ── PUT /offboarding/termination/:id/action ───
+// Payload: { status, finalLastWorkingDate, feedback, isGoodToRehire }
+// Response: { offboardingId, employeeName, status, finalLastWorkingDate }
+export const approveRejectTermination = async (offboardingId, payload) => {
+  const response = await axios.put(
+    buildApiUrl(`/offboarding/termination/${offboardingId}/action`),
+    payload,
+    authHeaders()
+  );
+  return response.data;
 };
 
 // ── GET /offboarding/resignation[/STATUS] ─────

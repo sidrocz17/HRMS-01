@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import EmployeeTable from "../components/employeeManagement/EmployeeTable";
 import DeactivateModal from "../components/employeeManagement/DeactivateModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
+import { getRoleFromToken } from "../utils/auth.js";
 import {
   deactivateEmployee,
   getEmployees,
@@ -92,7 +93,7 @@ export default function EmployeeManagement() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const currentUserRole = normalizeRole(localStorage.getItem("role"));
+  const currentUserRole = normalizeRole(getRoleFromToken());
 
   // Filtered employees based on search and status
   const filteredEmployees = employees.filter((emp) => {

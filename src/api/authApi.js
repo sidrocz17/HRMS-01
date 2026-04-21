@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getAccessToken, clearSession } from "../utils/authStorage";
+import { logoutAndRedirect } from "../utils/auth";
 import { buildUrl } from "./apiBase";
 
 const LOGOUT_PATH = buildUrl("/auth/logout");
@@ -28,5 +29,6 @@ export const logoutUser = async () => {
     throw error;
   } finally {
     clearSession();
+    logoutAndRedirect();
   }
 };
