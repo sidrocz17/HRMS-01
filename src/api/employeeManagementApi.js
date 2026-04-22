@@ -19,6 +19,10 @@ export const getEmployees = async (params = {}) => {
   }
 };
 
+export const getAllEmployees = async (params = {}) => {
+  return getEmployees(params);
+};
+
 /**
  * Fetch single employee by ID
  * @param {string} empId - Employee ID
@@ -131,6 +135,7 @@ export const searchEmployees = async (query) => {
 };
 
 export default {
+  getAllEmployees,
   getEmployees,
   getEmployeeById,
   updateEmployeeStatus,

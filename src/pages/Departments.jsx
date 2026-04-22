@@ -5,10 +5,17 @@ import StatusBadge from "../components/employee/StatusBadge";
 import ActionButtons from "../components/employee/ActionButtons";
 import DepartmentForm from "../components/department/DepartmentForm";
 import DeleteConfirm from "../components/department/DeleteConfirm";
+import MapDesignationsModal from "../components/department/MapDesignationsModal";
+import {
+  getMappedDesignations,
+  mapDesignationsToDepartment,
+} from "../api/deptDesigApi";
+import { fetchDesignations } from "../api/designationApi";
 import {
   createDepartment,
   deactivateDepartment,
   deleteDepartment,
+  fetchDepartmentById,
   fetchDepartments,
   updateDepartment,
 } from "../api/departmentApi";
@@ -55,6 +62,44 @@ const normalizeDepartment = (department, index = 0) => ({
   ),
 });
 
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.items)) return value.items;
+  return [];
+};
+
+const normalizeDesignation = (designation, index = 0) => ({
+  id:
+    designation?.id ||
+    designation?.designationId ||
+    designation?.desig_id ||
+    designation?.uuid ||
+    `designation-${index}`,
+  title:
+    designation?.title ||
+    designation?.designationName ||
+    designation?.name ||
+    "Untitled Designation",
+  description: designation?.description || "",
+});
+
+const getMappedDesignationIds = (payload) =>
+  toArray(payload)
+    .map(
+      (item) =>
+        item?.designationId ||
+        item?.desigId ||
+        item?.desig_id ||
+        item?.id ||
+        item?.designation?.id ||
+        item?.designation?.designationId ||
+        item?.designation?.desig_id ||
+        "",
+    )
+    .filter(Boolean)
+    .map((value) => String(value).trim());
+
 export default function Departments() {
   // ── Data state ────────────────────────────────
   const [departments, setDepartments] = useState([]); // empty — GET API fills this
@@ -67,12 +112,22 @@ export default function Departments() {
   const [formMode, setFormMode] = useState("add");
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [viewTarget, setViewTarget] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
   // ── API state ─────────────────────────────────
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
+
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapTarget, setMapTarget] = useState(null);
+  const [allDesignations, setAllDesignations] = useState([]);
+  const [mappedDesignationIds, setMappedDesignationIds] = useState([]);
+  const [mapSubmitting, setMapSubmitting] = useState(false);
+  const [mapApiError, setMapApiError] = useState("");
+  const [mapLoading, setMapLoading] = useState(false);
 
   // ── Load departments on page open ─────────────
   useEffect(() => {
@@ -158,6 +213,84 @@ export default function Departments() {
     setEditTarget(dept);
     setApiError("");
     setShowForm(true);
+  };
+
+  const handleView = async (dept) => {
+    setViewLoading(true);
+    setApiError("");
+
+    try {
+      const response = await fetchDepartmentById(dept.id);
+      setViewTarget(normalizeDepartment(response));
+    } catch (error) {
+      console.error("❌ Failed to fetch department details:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to load department details. Please try again.";
+      setApiError(message);
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const loadDesignations = async () => {
+    const data = await fetchDesignations();
+    const designationList = toArray(data);
+
+    return designationList
+      .map((designation, index) => normalizeDesignation(designation, index))
+      .filter((designation) => designation.id && designation.title);
+  };
+
+  const handleOpenMapModal = async (dept) => {
+    setMapTarget(dept);
+    setMapApiError("");
+    setMapLoading(true);
+
+    try {
+      const [designations, mappedResponse] = await Promise.all([
+        loadDesignations(),
+        getMappedDesignations(dept.id),
+      ]);
+
+      setAllDesignations(designations);
+      setMappedDesignationIds(getMappedDesignationIds(mappedResponse));
+      setShowMapModal(true);
+    } catch (error) {
+      console.error("❌ Failed to load department mappings:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to load designations for mapping. Please try again.";
+      setMapApiError(message);
+      setShowMapModal(true);
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
+  const handleMapSubmit = async (desigIds) => {
+    if (!mapTarget) return;
+
+    setMapSubmitting(true);
+    setMapApiError("");
+
+    try {
+      await mapDesignationsToDepartment(mapTarget.id, desigIds);
+      setMappedDesignationIds(desigIds.map((id) => String(id).trim()));
+      setShowMapModal(false);
+      setMapTarget(null);
+    } catch (error) {
+      console.error("❌ Failed to map designations:", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to map designations. Please try again.";
+      setMapApiError(message);
+    } finally {
+      setMapSubmitting(false);
+    }
   };
 
   // ── Form submit ───────────────────────────────
@@ -614,10 +747,11 @@ export default function Departments() {
                       {/* Actions */}
                       <td className="px-4 py-4">
                         <ActionButtons
-                          onView={() => {}}
+                          onView={() => handleView(dept)}
                           onEdit={() => handleEdit(dept)}
                           onDelete={() => handleDeleteClick(dept)}
-                          onMore={() => {}}
+                          onMore={() => handleOpenMapModal(dept)}
+                          moreLabel="Map Designations"
                         />
                       </td>
                     </tr>
@@ -725,6 +859,127 @@ export default function Departments() {
         />
       )}
 
+      {viewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Department Details
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  View the latest department information.
+                </p>
+              </div>
+              <button
+                onClick={() => setViewTarget(null)}
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all"
+                aria-label="Close department details"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Department ID
+                  </p>
+                  <p className="mt-1 break-all text-sm font-medium text-gray-800">
+                    {viewTarget.dept_id || "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Status
+                  </p>
+                  <div className="mt-1">
+                    <StatusBadge
+                      status={viewTarget.is_active ? "Active" : "Inactive"}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Department Name
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-800">
+                    {viewTarget.dept_name || "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Description
+                  </p>
+                  <p className="mt-1 text-sm text-gray-700">
+                    {viewTarget.description || "No description"}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Created Date
+                  </p>
+                  <p className="mt-1 text-sm text-gray-700">
+                    {viewTarget.createdOn || "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-gray-100 px-6 py-4">
+              <button
+                onClick={() => setViewTarget(null)}
+                className="rounded-xl bg-[#1a2240] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#243055] active:scale-95"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="rounded-2xl bg-white px-6 py-5 shadow-xl border border-gray-100">
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <svg
+                className="h-5 w-5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              Loading department details...
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteTarget && (
         <DeleteConfirm
           deptName={deleteTarget.dept_name}
@@ -735,6 +990,53 @@ export default function Departments() {
             if (!deleteSubmitting) {
               setDeleteTarget(null);
               setApiError("");
+            }
+          }}
+        />
+      )}
+      {mapLoading && mapTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="rounded-2xl bg-white px-6 py-5 shadow-xl border border-gray-100">
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <svg
+                className="h-5 w-5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              Loading designations...
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMapModal && mapTarget && (
+        <MapDesignationsModal
+          department={mapTarget}
+          allDesignations={allDesignations}
+          initialSelectedIds={mappedDesignationIds}
+          submitting={mapSubmitting}
+          apiError={mapApiError}
+          onSubmit={handleMapSubmit}
+          onClose={() => {
+            if (!mapSubmitting) {
+              setShowMapModal(false);
+              setMapTarget(null);
+              setMappedDesignationIds([]);
+              setMapApiError("");
             }
           }}
         />

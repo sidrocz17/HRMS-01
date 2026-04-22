@@ -21,6 +21,7 @@ import Offboarding from "./pages/Offboarding";
 import MyProfile from "./pages/MyProfile";
 import LeaveReports from "./pages/LeaveReports";
 import AttendanceReports from "./pages/AttendanceReports";
+import { EmployeeProvider } from "./context/EmployeeContext";
 
 function DashboardLayout({ page }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -64,152 +65,154 @@ function DashboardLayout({ page }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={<Login />} />
+      <EmployeeProvider>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<Login />} />
 
-        {/* Any logged-in role */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout page="dashboard" />
-            </ProtectedRoute>
-          }
-        />
+          {/* Any logged-in role */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout page="dashboard" />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Admin only */}
-        <Route
-          path="/departments"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <DashboardLayout page="departments" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/designation"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <DashboardLayout page="designation" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leave-types"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <DashboardLayout page="leave-types" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leave-policy"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <DashboardLayout page="leave-policy" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee-types"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <DashboardLayout page="employee-types" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/holidays"
-          element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
-            >
-              <DashboardLayout page="holidays" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/attendance-settings"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
-              <DashboardLayout page="attendance-settings" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leave-management"
-          element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
-            >
-              <DashboardLayout page="leave-management" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee-onboarding"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
-              <DashboardLayout page="employee-onboarding" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee-management"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
-              <DashboardLayout page="employee-management" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/attendance"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout page="attendance" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/offboarding"
-          element={
-            <ProtectedRoute
-              allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
-            >
-              <DashboardLayout page="offboarding" />
-            </ProtectedRoute>
-          }
-        />
+          {/* Admin only */}
+          <Route
+            path="/departments"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                <DashboardLayout page="departments" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/designation"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                <DashboardLayout page="designation" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leave-types"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                <DashboardLayout page="leave-types" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leave-policy"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                <DashboardLayout page="leave-policy" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/employee-types"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                <DashboardLayout page="employee-types" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/holidays"
+            element={
+              <ProtectedRoute
+                allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
+              >
+                <DashboardLayout page="holidays" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/attendance-settings"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+                <DashboardLayout page="attendance-settings" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leave-management"
+            element={
+              <ProtectedRoute
+                allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
+              >
+                <DashboardLayout page="leave-management" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/employee-onboarding"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+                <DashboardLayout page="employee-onboarding" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/employee-management"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+                <DashboardLayout page="employee-management" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/attendance"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout page="attendance" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/offboarding"
+            element={
+              <ProtectedRoute
+                allowedRoles={[ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE]}
+              >
+                <DashboardLayout page="offboarding" />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/my-profile"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout page="my-profile" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports/employee"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
-              <DashboardLayout page="reports/leave" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports/attendance"
-          element={
-            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
-              <DashboardLayout page="reports/attendance" />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/my-profile"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout page="my-profile" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/employee"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+                <DashboardLayout page="reports/leave" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/attendance"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
+                <DashboardLayout page="reports/attendance" />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </EmployeeProvider>
     </BrowserRouter>
   );
 }

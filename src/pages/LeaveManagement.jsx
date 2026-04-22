@@ -5,17 +5,21 @@
 //  UI matches Department/Designation pages exactly
 // ─────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import LeaveBalanceSection from "../components/leave/LeaveBalanceSection";
 import LeaveTable from "../components/leave/LeaveTable";
 import TeamLeaveTable from "../components/leave/TeamLeaveTable";
 import ApplyLeaveModal from "../components/leave/ApplyLeaveModal";
 import ApproveLeaveModal from "../components/leave/ApproveLeaveModal";
+import LeaveDetailsModal from "../components/leave/LeaveDetailsModal";
 import PostYearlyLeavesModal from "../components/modals/PostYearlyLeavesModal";
 import {
   applyLeave,
   fetchLeaveBalance,
+  fetchLeaveDetails,
   fetchLeaveHistory,
+  fetchLeaveSummary,
   fetchTeamLeaves,
   approveRejectLeave,
   postYearlyLeavesForAllEmployees,
@@ -102,7 +106,9 @@ const mapLeaveHistoryItem = (item = {}, index = 0) => ({
     formatDisplayDate(
       item.appliedOn ||
         item.appliedDate ||
+        item.createdOn ||
         item.createdAt ||
+        item.created_on ||
         item.created_at
     ) || "-",
   remarks: item.remarks || "",
@@ -112,7 +118,9 @@ const mapLeaveHistoryItem = (item = {}, index = 0) => ({
     item.from_date ||
     item.appliedOn ||
     item.appliedDate ||
+    item.createdOn ||
     item.createdAt ||
+    item.created_on ||
     item.created_at ||
     "",
 });
@@ -126,61 +134,75 @@ const normalizeLeaveHistory = (response) =>
         new Date(b.sort_date || 0).getTime() - new Date(a.sort_date || 0).getTime()
     );
 
-const mapTeamLeaveItem = (item = {}, index = 0) => ({
-  id:
-    item.leaveApplicationId ||
-    item.leaveId ||
-    item.id ||
-    item.uuid ||
-    String(index + 1),
-  employee_name:
-    item.employeeName ||
-    item.employee_name ||
-    item.empName ||
-    item.emp_name ||
-    item.fullName ||
-    item.name ||
-    "Employee",
-  employee_id:
+const mapTeamLeaveItem = (item = {}, index = 0, currentEmployeeId = "") => {
+  const employeeId = String(
     item.empId ||
-    item.emp_id ||
-    item.employeeId ||
-    item.employee_id ||
-    "",
-  leave_type:
-    item.leaveType ||
-    item.leaveTypeName ||
-    item.leave_type ||
-    item.typeName ||
-    "Leave",
-  from_date:
-    formatDisplayDate(item.startDate || item.fromDate || item.from_date) || "-",
-  to_date:
-    formatDisplayDate(item.endDate || item.toDate || item.to_date) || "-",
-  days: item.noOfDays ?? item.days ?? 0,
-  status: toTitleCaseStatus(item.status),
-  applied_on:
-    formatDisplayDate(
-      item.appliedOn ||
-        item.appliedDate ||
-        item.createdAt ||
-        item.created_at
-    ) || "-",
-  remarks: item.remarks || "",
-  sort_date:
-    item.appliedOn ||
-    item.appliedDate ||
-    item.createdAt ||
-    item.created_at ||
-    item.startDate ||
-    item.fromDate ||
-    item.from_date ||
-    "",
-});
+      item.emp_id ||
+      item.employeeId ||
+      item.employee_id ||
+      ""
+  ).trim();
+  const normalizedCurrentEmployeeId = String(currentEmployeeId || "").trim();
 
-const normalizeTeamLeaves = (response) =>
+  return {
+    id:
+      item.leaveApplicationId ||
+      item.leaveId ||
+      item.id ||
+      item.uuid ||
+      String(index + 1),
+    employee_name:
+      item.employeeName ||
+      item.employee_name ||
+      item.empName ||
+      item.emp_name ||
+      item.fullName ||
+      item.name ||
+      "Employee",
+    employee_id: employeeId,
+    is_own_leave:
+      Boolean(normalizedCurrentEmployeeId) &&
+      Boolean(employeeId) &&
+      normalizedCurrentEmployeeId === employeeId,
+    leave_type:
+      item.leaveType ||
+      item.leaveTypeName ||
+      item.leave_type ||
+      item.typeName ||
+      "Leave",
+    from_date:
+      formatDisplayDate(item.startDate || item.fromDate || item.from_date) || "-",
+    to_date:
+      formatDisplayDate(item.endDate || item.toDate || item.to_date) || "-",
+    days: item.noOfDays ?? item.days ?? 0,
+    status: toTitleCaseStatus(item.status),
+    applied_on:
+      formatDisplayDate(
+        item.appliedOn ||
+          item.appliedDate ||
+          item.createdOn ||
+          item.createdAt ||
+          item.created_on ||
+          item.created_at
+      ) || "-",
+    remarks: item.remarks || "",
+    sort_date:
+      item.appliedOn ||
+      item.appliedDate ||
+      item.createdOn ||
+      item.createdAt ||
+      item.created_on ||
+      item.created_at ||
+      item.startDate ||
+      item.fromDate ||
+      item.from_date ||
+      "",
+  };
+};
+
+const normalizeTeamLeaves = (response, currentEmployeeId = "") =>
   toArray(response)
-    .map(mapTeamLeaveItem)
+    .map((item, index) => mapTeamLeaveItem(item, index, currentEmployeeId))
     .filter((item) => item.id)
     .sort(
       (a, b) =>
@@ -188,6 +210,7 @@ const normalizeTeamLeaves = (response) =>
     );
 
 export default function LeaveManagement() {
+  const [searchParams] = useSearchParams();
   // ── RBAC ──────────────────────────────────────
   const { role, empId: loggedInEmployeeId } = getUserFromToken();
   const hasEmployeeId = Boolean(String(loggedInEmployeeId || "").trim());
@@ -197,94 +220,128 @@ export default function LeaveManagement() {
   const [myLeaves, setMyLeaves] = useState([]);
   const [teamLeaves, setTeamLeaves] = useState([]);
   const [leaveBalance, setLeaveBalance] = useState([]);
+  const [leaveSummary, setLeaveSummary] = useState(null);
   const [leaveTypes, setLeaveTypes] = useState([]);
 
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showYearlyLeavesModal, setShowYearlyLeavesModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showLeaveDetailsModal, setShowLeaveDetailsModal] = useState(false);
   const [approvalTarget, setApprovalTarget] = useState(null);
   const [approvalAction, setApprovalAction] = useState(null);
+  const [leaveDetails, setLeaveDetails] = useState(null);
+  const [leaveDetailsLoading, setLeaveDetailsLoading] = useState(false);
+  const [leaveDetailsError, setLeaveDetailsError] = useState("");
   const [apiError, setApiError] = useState("");
 
   const canViewTeamLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
   const canPostYearlyLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
 
-  useEffect(() => {
-    const loadLeaveData = async () => {
-      try {
-        const [balanceResult, historyResult, teamLeavesResult, leaveTypesResult] =
-          await Promise.allSettled([
+  const loadLeaveData = useCallback(async () => {
+    try {
+      const [
+        balanceResult,
+        historyResult,
+        teamLeavesResult,
+        leaveTypesResult,
+        leaveSummaryResult,
+      ] =
+        await Promise.allSettled([
           hasEmployeeId ? fetchLeaveBalance(loggedInEmployeeId) : Promise.resolve([]),
           hasEmployeeId ? fetchLeaveHistory(loggedInEmployeeId) : Promise.resolve([]),
           canViewTeamLeaves ? fetchTeamLeaves() : Promise.resolve([]),
           fetchLeaveTypes(),
-          ]);
+          fetchLeaveSummary(),
+        ]);
 
-        if (balanceResult.status === "fulfilled") {
-          setLeaveBalance(normalizeLeaveBalance(balanceResult.value));
-        } else {
-          setLeaveBalance([]);
-          // Don't block the page if employeeId is missing; show a message only when user tries to apply.
-          if (hasEmployeeId) {
-            setApiError(
-              balanceResult.reason?.response?.data?.message ||
-                balanceResult.reason?.message ||
-                "Failed to load leave balance"
-            );
-          }
-        }
-
-        if (historyResult.status === "fulfilled") {
-          setMyLeaves(normalizeLeaveHistory(historyResult.value));
-        } else {
-          setMyLeaves([]);
-          if (hasEmployeeId) {
-            setApiError(
-              historyResult.reason?.response?.data?.message ||
-                historyResult.reason?.message ||
-                "Failed to load leave history"
-            );
-          }
-        }
-
-        if (teamLeavesResult.status === "fulfilled") {
-          setTeamLeaves(normalizeTeamLeaves(teamLeavesResult.value));
-        } else {
-          setTeamLeaves([]);
-          if (canViewTeamLeaves) {
-            setApiError(
-              teamLeavesResult.reason?.response?.data?.message ||
-                teamLeavesResult.reason?.message ||
-                "Failed to load leave requests"
-            );
-          }
-        }
-
-        if (leaveTypesResult.status === "fulfilled") {
-          const raw = toArray(leaveTypesResult.value);
-          const normalized = raw
-            .map((t) => ({
-              id: t.typeId ?? t.id ?? t.type_id,
-              name: t.type ?? t.leaveType ?? t.name ?? t.label ?? "",
-            }))
-            .filter((t) => t.id && t.name);
-
-          setLeaveTypes(normalized);
-        }
-      } catch (error) {
-        console.error("❌ Failed to load leave data:", error);
+      if (balanceResult.status === "fulfilled") {
+        setLeaveBalance(normalizeLeaveBalance(balanceResult.value));
+      } else {
         setLeaveBalance([]);
-        setApiError(
-          error?.response?.data?.message ||
-            error?.response?.data?.error ||
-            error?.message ||
-            "Failed to load leave data"
-        );
+        // Don't block the page if employeeId is missing; show a message only when user tries to apply.
+        if (hasEmployeeId) {
+          setApiError(
+            balanceResult.reason?.response?.data?.message ||
+              balanceResult.reason?.message ||
+              "Failed to load leave balance"
+          );
+        }
       }
-    };
 
-    loadLeaveData();
+      if (historyResult.status === "fulfilled") {
+        setMyLeaves(normalizeLeaveHistory(historyResult.value));
+      } else {
+        setMyLeaves([]);
+        if (hasEmployeeId) {
+          setApiError(
+            historyResult.reason?.response?.data?.message ||
+              historyResult.reason?.message ||
+              "Failed to load leave history"
+          );
+        }
+      }
+
+      if (teamLeavesResult.status === "fulfilled") {
+        setTeamLeaves(
+          normalizeTeamLeaves(teamLeavesResult.value, loggedInEmployeeId)
+        );
+      } else {
+        setTeamLeaves([]);
+        if (canViewTeamLeaves) {
+          setApiError(
+            teamLeavesResult.reason?.response?.data?.message ||
+              teamLeavesResult.reason?.message ||
+              "Failed to load leave requests"
+          );
+        }
+      }
+
+      if (leaveTypesResult.status === "fulfilled") {
+        const raw = toArray(leaveTypesResult.value);
+        const normalized = raw
+          .map((t) => ({
+            id: t.typeId ?? t.id ?? t.type_id,
+            name: t.type ?? t.leaveType ?? t.name ?? t.label ?? "",
+          }))
+          .filter((t) => t.id && t.name);
+
+        setLeaveTypes(normalized);
+      }
+
+      if (leaveSummaryResult.status === "fulfilled") {
+        setLeaveSummary(leaveSummaryResult.value || null);
+      } else {
+        setLeaveSummary(null);
+      }
+
+    } catch (error) {
+      console.error("❌ Failed to load leave data:", error);
+      setLeaveBalance([]);
+      setApiError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to load leave data"
+      );
+    }
   }, [canViewTeamLeaves, hasEmployeeId, loggedInEmployeeId]);
+
+  useEffect(() => {
+    loadLeaveData();
+  }, [loadLeaveData]);
+
+  useEffect(() => {
+    const requestedTab = String(searchParams.get("tab") || "").trim().toLowerCase();
+
+    if (requestedTab === "team-leaves" && canViewTeamLeaves) {
+      setActiveTab("team-leaves");
+      return;
+    }
+
+    if (!canViewTeamLeaves && activeTab === "team-leaves") {
+      setActiveTab("my-leaves");
+    }
+  }, [activeTab, canViewTeamLeaves, searchParams]);
 
   const resolveLeaveTypeName = (balanceItem) => {
     if (!leaveTypes.length) return balanceItem.leave_type;
@@ -325,10 +382,7 @@ export default function LeaveManagement() {
       const response = await applyLeave(formData);
       console.log("✅ Leave apply response:", response);
 
-      if (hasEmployeeId) {
-        const refreshedHistory = await fetchLeaveHistory(loggedInEmployeeId);
-        setMyLeaves(normalizeLeaveHistory(refreshedHistory));
-      }
+      await loadLeaveData();
       setShowApplyModal(false);
     } catch (error) {
       console.error("❌ Apply leave failed:", error);
@@ -357,11 +411,7 @@ export default function LeaveManagement() {
     try {
       setApiError("");
       await approveRejectLeave(approvalTarget.id, action, remarks);
-
-      if (canViewTeamLeaves) {
-        const refreshedRequests = await fetchTeamLeaves();
-        setTeamLeaves(normalizeTeamLeaves(refreshedRequests));
-      }
+      await loadLeaveData();
 
       console.log(`Leave ${action}ed:`, {
         leaveId: approvalTarget.id,
@@ -383,6 +433,30 @@ export default function LeaveManagement() {
   // ── Cancel Leave ──────────────────────────────
   const handleCancelLeave = (leaveId) => {
     setMyLeaves((prev) => prev.filter((l) => l.id !== leaveId));
+  };
+
+  const handleViewLeave = async (leave) => {
+    if (!leave?.id) return;
+
+    setShowLeaveDetailsModal(true);
+    setLeaveDetails(null);
+    setLeaveDetailsError("");
+    setLeaveDetailsLoading(true);
+
+    try {
+      const response = await fetchLeaveDetails(leave.id);
+      setLeaveDetails(response);
+    } catch (error) {
+      console.error("❌ Failed to fetch leave details:", error);
+      setLeaveDetailsError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to load leave details"
+      );
+    } finally {
+      setLeaveDetailsLoading(false);
+    }
   };
 
   return (
@@ -449,7 +523,7 @@ export default function LeaveManagement() {
       </div>
 
       {/* ── Leave Balance Section ── */}
-      <LeaveBalanceSection data={leaveBalance} />
+      <LeaveBalanceSection data={leaveBalance} summary={leaveSummary} />
 
       {/* ── API Error ── */}
       {apiError && (
@@ -509,6 +583,7 @@ export default function LeaveManagement() {
           data={teamLeaves}
           role={role}
           onApprove={handleApproveClick}
+          onView={handleViewLeave}
         />
       )}
 
@@ -545,6 +620,19 @@ export default function LeaveManagement() {
           }}
         />
       )}
+
+      <LeaveDetailsModal
+        isOpen={showLeaveDetailsModal}
+        details={leaveDetails}
+        isLoading={leaveDetailsLoading}
+        error={leaveDetailsError}
+        onClose={() => {
+          setShowLeaveDetailsModal(false);
+          setLeaveDetails(null);
+          setLeaveDetailsError("");
+          setLeaveDetailsLoading(false);
+        }}
+      />
     </div>
   );
 }

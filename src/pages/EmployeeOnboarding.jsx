@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { createEmployee } from "../api/employeeApi";
 import { getEmployeeById, updateEmployee } from "../api/employeeManagementApi";
 import { fetchDepartments } from "../api/departmentApi";
+import { getMappedDesignations } from "../api/deptDesigApi";
 import { fetchDesignations } from "../api/designationApi";
 import { fetchEmployeeTypes } from "../api/employeeTypeApi";
 import { allocateEmployeeLeaves } from "../api/leaveApi";
@@ -103,6 +104,39 @@ const mapDesignationOption = (item = {}) => ({
   title: item.title || item.designationName || item.name || "",
 });
 
+const getMappedDesignationOptions = (payload) => {
+  const items = toArray(payload);
+
+  return items
+    .map((item) =>
+      mapDesignationOption(
+        item?.designation && typeof item.designation === "object"
+          ? item.designation
+          : item,
+      ),
+    )
+    .filter((item) => item.id && item.title);
+};
+
+const getMappedDesignationIds = (payload) => {
+  const items = toArray(payload);
+
+  return items
+    .map((item) =>
+      firstFilledValue(
+        item?.designationId,
+        item?.desigId,
+        item?.desig_id,
+        item?.id,
+        item?.designation?.id,
+        item?.designation?.designationId,
+        item?.designation?.desig_id,
+      ),
+    )
+    .filter(Boolean)
+    .map((value) => String(value).trim());
+};
+
 const mapEmployeeTypeOption = (item = {}) => ({
   id:
     item.id ||
@@ -119,6 +153,23 @@ const mapEmployeeTypeOption = (item = {}) => ({
     item.is_active_flag ??
     true,
 });
+
+const resolveOptionId = (value, options = []) => {
+  const normalizedValue = String(value || "").trim();
+  if (!normalizedValue) return "";
+
+  const matchedById = options.find(
+    (option) => String(option.id || "").trim() === normalizedValue
+  );
+  if (matchedById) return matchedById.id;
+
+  const loweredValue = normalizedValue.toLowerCase();
+  const matchedByTitle = options.find(
+    (option) => String(option.title || "").trim().toLowerCase() === loweredValue
+  );
+
+  return matchedByTitle?.id || normalizedValue;
+};
 
 const toInputDate = (value) => {
   if (!value) return "";
@@ -159,6 +210,13 @@ const mapEmployeeToFormData = (employee = {}) => {
   const department = employee.department || employee.department_details || {};
   const designation =
     employee.designation || employee.designation_details || {};
+  const employeeType =
+    employee.employeeType ||
+    employee.employee_type ||
+    employee.employmentType ||
+    employee.employment_type ||
+    employee.employeeTypeDetails ||
+    {};
 
   const mapped = {
     basicInfo: {
@@ -216,6 +274,11 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.employment_type_id,
         employee.empTypeId,
         employee.emp_type_id,
+        employeeType.id,
+        employeeType.employeeTypeId,
+        employeeType.employee_type_id,
+        employeeType.employmentTypeId,
+        employeeType.employment_type_id,
       ),
       role: normalizeRole(
         firstFilledValue(employee.role, employee.user_role, employee.userRole),
@@ -267,6 +330,7 @@ export default function EmployeeOnboarding() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
   const [departments, setDepartments] = useState([]);
+  const [allDesignations, setAllDesignations] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [employeeTypes, setEmployeeTypes] = useState([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -278,6 +342,7 @@ export default function EmployeeOnboarding() {
   const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
   const [assignLeaveTypes, setAssignLeaveTypes] = useState([]);
   const [assignLeaveTypesLoading, setAssignLeaveTypesLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -308,6 +373,12 @@ export default function EmployeeOnboarding() {
             .filter((item) => item.id && item.title),
         );
 
+        setAllDesignations(
+          toArray(designationsData)
+            .map(mapDesignationOption)
+            .filter((item) => item.id && item.title),
+        );
+
         setEmployeeTypes(
           toArray(employeeTypesData)
             .map(mapEmployeeTypeOption)
@@ -324,6 +395,89 @@ export default function EmployeeOnboarding() {
   }, []);
 
   useEffect(() => {
+    const selectedDepartmentId = String(formData.jobDetails.dept_id || "").trim();
+
+    if (!selectedDepartmentId) {
+      setDesignations([]);
+      setFormData((prev) => {
+        if (!prev.jobDetails.desig_id) return prev;
+
+        return {
+          ...prev,
+          jobDetails: {
+            ...prev.jobDetails,
+            desig_id: "",
+          },
+        };
+      });
+      return;
+    }
+
+    if (!allDesignations.length) return;
+
+    let isMounted = true;
+
+    const loadMappedDesignations = async () => {
+      try {
+        const response = await getMappedDesignations(selectedDepartmentId);
+        if (!isMounted) return;
+
+        const mappedIds = new Set(getMappedDesignationIds(response));
+        const mappedOptions = getMappedDesignationOptions(response);
+        const selectedDesignationId = String(formData.jobDetails.desig_id || "").trim();
+
+        const filteredDesignations = mappedOptions.length
+          ? mappedOptions
+          : mappedIds.size > 0
+            ? allDesignations.filter((designation) =>
+                mappedIds.has(String(designation.id).trim())
+              )
+            : [];
+
+        const selectedDesignationOption = allDesignations.find(
+          (designation) => String(designation.id).trim() === selectedDesignationId
+        );
+
+        const nextDesignations =
+          selectedDesignationOption &&
+          selectedDesignationId &&
+          !filteredDesignations.some(
+            (designation) =>
+              String(designation.id).trim() === selectedDesignationId
+          )
+            ? [...filteredDesignations, selectedDesignationOption]
+            : filteredDesignations;
+
+        setDesignations(nextDesignations);
+
+        const selectedStillValid = nextDesignations.some(
+          (designation) =>
+            String(designation.id).trim() === selectedDesignationId
+        );
+
+        if (!selectedStillValid && selectedDesignationId) {
+          setFormData((prev) => ({
+            ...prev,
+            jobDetails: {
+              ...prev.jobDetails,
+              desig_id: "",
+            },
+          }));
+        }
+      } catch (error) {
+        console.error("❌ Failed to load mapped designations:", error);
+        if (isMounted) setDesignations(allDesignations);
+      }
+    };
+
+    loadMappedDesignations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [allDesignations, formData.jobDetails.dept_id, formData.jobDetails.desig_id]);
+
+  useEffect(() => {
     const routeEmployee = location.state?.employee;
 
     const hydrateEditData = async () => {
@@ -334,8 +488,12 @@ export default function EmployeeOnboarding() {
 
       try {
         if (routeEmployee) {
-          setFormData(mapEmployeeToFormData(routeEmployee));
-          return;
+          const mappedRouteEmployee = mapEmployeeToFormData(routeEmployee);
+          setFormData(mappedRouteEmployee);
+
+          if (mappedRouteEmployee.jobDetails.employee_type_id) {
+            return;
+          }
         }
 
         if (employeeId) {
@@ -355,6 +513,29 @@ export default function EmployeeOnboarding() {
 
     hydrateEditData();
   }, [isEditMode, employeeId, location.state]);
+
+  useEffect(() => {
+    if (!employeeTypes.length) return;
+
+    setFormData((prev) => {
+      const resolvedEmployeeTypeId = resolveOptionId(
+        prev.jobDetails.employee_type_id,
+        employeeTypes
+      );
+
+      if (resolvedEmployeeTypeId === prev.jobDetails.employee_type_id) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        jobDetails: {
+          ...prev.jobDetails,
+          employee_type_id: resolvedEmployeeTypeId,
+        },
+      };
+    });
+  }, [employeeTypes]);
 
   const handleFieldChange = (section, field, value) => {
     setFormData((prev) => ({
@@ -660,7 +841,7 @@ export default function EmployeeOnboarding() {
   };
 
   const handleCancel = () => {
-    if (
+    const hasUnsavedChanges =
       Object.values(formData).some(
         (section) =>
           (Array.isArray(section) &&
@@ -672,14 +853,14 @@ export default function EmployeeOnboarding() {
             Object.values(section).some(
               (val) => val !== "" && val !== 0 && val !== null,
             )),
-      )
-    ) {
-      if (window.confirm("Discard unsaved changes?")) {
-        navigate(-1);
-      }
-    } else {
-      navigate(-1);
+      );
+
+    if (hasUnsavedChanges) {
+      setShowCancelConfirm(true);
+      return;
     }
+
+    navigate(-1);
   };
 
   return (
@@ -771,7 +952,12 @@ export default function EmployeeOnboarding() {
           )}
 
           {step === 4 && (
-            <ReviewStep formData={formData} employeeTypes={employeeTypes} />
+            <ReviewStep
+              formData={formData}
+              employeeTypes={employeeTypes}
+              departments={departments}
+              designations={designations}
+            />
           )}
         </div>
 
@@ -864,6 +1050,39 @@ export default function EmployeeOnboarding() {
         leaveTypes={assignLeaveTypes}
         onSubmit={handleAssignLeave}
       />
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">
+                Discard unsaved changes?
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Your onboarding form has unsaved changes. If you leave now,
+                they will be lost.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+              >
+                Continue Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

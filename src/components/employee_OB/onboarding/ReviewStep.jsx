@@ -1,23 +1,12 @@
 // src/components/employee/onboarding/ReviewStep.jsx
 import { ROLES } from "../../../config/roles.jsx";
 
-export default function ReviewStep({ formData, employeeTypes = [] }) {
-  const DEPARTMENTS = {
-    "1": "Engineering",
-    "2": "Sales",
-    "3": "Marketing",
-    "4": "HR",
-    "5": "Finance",
-  };
-
-  const DESIGNATIONS = {
-    "1": "Junior Engineer",
-    "2": "Senior Engineer",
-    "3": "Sales Executive",
-    "4": "Manager",
-    "5": "Director",
-  };
-
+export default function ReviewStep({
+  formData,
+  employeeTypes = [],
+  departments = [],
+  designations = [],
+}) {
   const MANAGERS = {
     "1": "Rajesh Kumar",
     "2": "Priya Singh",
@@ -25,6 +14,13 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
     "4": "Neha Sharma",
   };
 
+  const departmentLabel =
+    departments.find((dept) => String(dept.id) === String(formData.jobDetails.dept_id))
+      ?.title || "-";
+  const designationLabel =
+    designations.find(
+      (desig) => String(desig.id) === String(formData.jobDetails.desig_id)
+    )?.title || "-";
   const employeeTypeLabel =
     employeeTypes.find((t) => String(t.id) === String(formData.jobDetails.employee_type_id))
       ?.title || "-";
@@ -91,14 +87,8 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
 
       {/* Job Details */}
       <Section title="Job Details">
-        <Field
-          label="Department"
-          value={DEPARTMENTS[formData.jobDetails.dept_id] || "-"}
-        />
-        <Field
-          label="Designation"
-          value={DESIGNATIONS[formData.jobDetails.desig_id] || "-"}
-        />
+        <Field label="Department" value={departmentLabel} />
+        <Field label="Designation" value={designationLabel} />
         <Field label="Employee Type" value={employeeTypeLabel} />
         <Field
           label="Reporting Manager"

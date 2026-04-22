@@ -6,7 +6,7 @@
 //  Navigation wired to all child + parent items.
 // ─────────────────────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   MENU_CONFIG,
@@ -83,12 +83,31 @@ export default function Sidebar({ isOpen = true }) {
     const match = Object.entries(ROUTE_MAP).find(
       ([, path]) => path === location.pathname,
     );
-    return match ? match[0] : "Dashboard";
+    return match ? match[0] : "";
   };
 
-  const [activeItem, setActiveItem] = useState(getActiveFromPath);
   const [expanded, setExpanded] = useState({});
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const routeActiveItem = useMemo(getActiveFromPath, [location.pathname]);
+  const [activeItem, setActiveItem] = useState(() => routeActiveItem || "Dashboard");
+
+  useEffect(() => {
+    if (!routeActiveItem) return;
+    setActiveItem(routeActiveItem);
+  }, [routeActiveItem]);
+
+  useEffect(() => {
+    const activeParent = navItems.find((item) =>
+      item.children?.includes(activeItem)
+    );
+
+    if (!activeParent) return;
+
+    setExpanded((prev) => {
+      if (prev[activeParent.label]) return prev;
+      return { ...prev, [activeParent.label]: true };
+    });
+  }, [activeItem, navItems]);
 
   const toggle = (label) =>
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -158,28 +177,37 @@ export default function Sidebar({ isOpen = true }) {
       <nav className="flex-1 px-3 pb-4 space-y-0.5">
         {navItems.map((item) => (
           <div key={item.label}>
+            {(() => {
+              const isParentActive =
+                activeItem === item.label ||
+                item.children?.includes(activeItem);
+
+              return (
+                <>
             {/* ── No children → direct link ── */}
             {item.children.length === 0 ? (
               <button
                 onClick={() => handleNavigate(item.label)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150 ${
                   activeItem === item.label
                     ? "bg-[#f5a623] text-[#1a2240]"
                     : "text-white/70 hover:text-white hover:bg-white/10"
                 }`}
               >
                 <span
-                  className={
+                  className={`shrink-0 ${
                     activeItem === item.label
                       ? "text-[#1a2240]"
                       : "text-white/60"
-                  }
+                  }`}
                 >
                   {item.icon}
                 </span>
-                {item.label}
+                <span className="min-w-0 flex-1 leading-5 break-words">
+                  {item.label}
+                </span>
                 {activeItem === item.label && (
-                  <span className="ml-auto">
+                  <span className="ml-auto shrink-0">
                     <svg
                       className="w-4 h-4"
                       fill="currentColor"
@@ -194,12 +222,31 @@ export default function Sidebar({ isOpen = true }) {
               /* ── Has children → collapsible section ── */
               <>
                 <button
-                  onClick={() => toggle(item.label)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition-all duration-150"
+                  onClick={() => {
+                    setActiveItem(item.label);
+                    toggle(item.label);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left transition-all duration-150 ${
+                    isParentActive
+                      ? "bg-[#f5a623] text-[#1a2240]"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  }`}
                 >
-                  <span className="text-white/60">{item.icon}</span>
-                  {item.label}
-                  <span className="ml-auto text-white/40">
+                  <span
+                    className={`shrink-0 ${
+                      isParentActive ? "text-[#1a2240]" : "text-white/60"
+                    }`}
+                  >
+                    {item.icon}
+                  </span>
+                  <span className="min-w-0 flex-1 leading-5 break-words">
+                    {item.label}
+                  </span>
+                  <span
+                    className={`ml-auto shrink-0 ${
+                      isParentActive ? "text-[#1a2240]" : "text-white/40"
+                    }`}
+                  >
                     <svg
                       className={`w-4 h-4 transition-transform duration-200 ${
                         expanded[item.label] ? "rotate-180" : ""
@@ -237,6 +284,9 @@ export default function Sidebar({ isOpen = true }) {
                 )}
               </>
             )}
+                </>
+              );
+            })()}
           </div>
         ))}
 

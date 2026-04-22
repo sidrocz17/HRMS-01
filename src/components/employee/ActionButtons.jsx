@@ -10,7 +10,13 @@ const Tooltip = ({ text, children }) => (
   </div>
 );
 
-export default function ActionButtons({ onView, onEdit, onDelete, onMore }) {
+export default function ActionButtons({
+  onView,
+  onEdit,
+  onDelete,
+  onMore,
+  moreLabel = "More",
+}) {
   return (
     <div className="flex items-center gap-1">
 
@@ -56,7 +62,7 @@ export default function ActionButtons({ onView, onEdit, onDelete, onMore }) {
       </Tooltip>
 
       {/* More */}
-      <Tooltip text="More">
+      <Tooltip text={moreLabel}>
         <button
           onClick={onMore}
           className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all duration-150"
