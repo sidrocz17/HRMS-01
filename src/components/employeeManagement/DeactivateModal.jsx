@@ -10,6 +10,7 @@ export default function DeactivateModal({
   // Initial state: both OFF (employee stays active, user stays active)
   const [employeeActive, setEmployeeActive] = useState(true); // Inverted: true = keep active
   const [userActive, setUserActive] = useState(true); // Inverted: true = keep active
+  const [error, setError] = useState("");
 
   /**
    * Business Logic:
@@ -32,6 +33,10 @@ export default function DeactivateModal({
     }
   }, [employeeActive, userActive]);
 
+  useEffect(() => {
+    setError("");
+  }, [employeeActive, userActive]);
+
   const handleEmployeeToggle = () => {
     const newEmployeeActive = !employeeActive;
     setEmployeeActive(newEmployeeActive);
@@ -52,7 +57,7 @@ export default function DeactivateModal({
     // Validate: can't have employee active + user inactive is allowed
     // But can't have employee inactive + user active
     if (!employeeActive && userActive) {
-      alert("Invalid state: Cannot deactivate employee while keeping user active");
+      setError("Cannot deactivate employee while keeping user active.");
       setUserActive(false);
       return;
     }
@@ -163,6 +168,12 @@ export default function DeactivateModal({
               <li>• Cannot keep user active if employee is deactivated</li>
             </ul>
           </div>
+
+          {error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
         </div>
 
         {/* Footer */}

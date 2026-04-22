@@ -17,13 +17,6 @@ const DESIGNATIONS = [
   { id: "5", title: "Director" },
 ];
 
-const MANAGERS = [
-  { id: "1", name: "Rajesh Kumar" },
-  { id: "2", name: "Priya Singh" },
-  { id: "3", name: "Amit Patel" },
-  { id: "4", name: "Neha Sharma" },
-];
-
 const ROLE_OPTIONS = [
   { value: ROLES.ADMIN, label: "ADMIN" },
   { value: ROLES.EMPLOYEE, label: "EMPLOYEE" },
@@ -37,7 +30,7 @@ export default function JobDetailsStep({
   departments = DEPARTMENTS,
   designations = DESIGNATIONS,
   employeeTypes = [],
-  managers = MANAGERS,
+  managers = [],
 }) {
   const inputClass = (fieldName) =>
     `w-full px-4 py-2.5 text-sm border rounded-xl outline-none transition-all
@@ -152,7 +145,7 @@ export default function JobDetailsStep({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Reporting Manager <span className="text-red-500">*</span>
+              Reporting Manager
             </label>
             <select
               value={data.reporting_manager}

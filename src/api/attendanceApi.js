@@ -318,13 +318,23 @@ export const punchOut = async () => postAttendanceToggle();
 
 // ── GET /attendance/employee/:id ──────────────
 // Returns attendance history for the logged-in employee.
-export const getAttendance = async () => {
-  const employeeId = getRequiredEmployeeId();
+export const getAttendanceByEmployeeId = async (employeeId) => {
+  const normalizedEmployeeId = String(employeeId || "").trim();
+
+  if (!normalizedEmployeeId) {
+    throw new Error("Employee ID is required to load attendance history.");
+  }
+
   const response = await axios.get(
-    buildApiUrl(`/attendance/employee/${employeeId}`),
+    buildApiUrl(`/attendance/employee/${normalizedEmployeeId}`),
     authHeaders()
   );
   return normalizeAttendanceResponse(response.data);
+};
+
+export const getAttendance = async () => {
+  const employeeId = getRequiredEmployeeId();
+  return getAttendanceByEmployeeId(employeeId);
 };
 
 // ── GET /attendance/all?date=YYYY-MM-DD ───────

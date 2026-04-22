@@ -38,11 +38,10 @@ const Tooltip = ({ text, children }) => (
   </div>
 );
 
-// ── Helper: derive FY label from dates ────────
-const getFYLabel = (start_date) => {
+// ── Helper: derive calendar-year label from dates ─
+const getCalendarYearLabel = (start_date) => {
   if (!start_date) return "—";
-  const year = new Date(start_date).getFullYear();
-  return `${year}-${String(year + 1).slice(-2)}`;
+  return String(new Date(start_date).getFullYear());
 };
 
 const toArray = (value) => {
@@ -127,7 +126,7 @@ const mapPolicyItem = (d = {}) => ({
   no_of_days: d.noOfDays ?? d.no_of_days ?? 0,
   start_date: d.startDate || d.start_date || "",
   end_date: d.endDate || d.end_date || "",
-  financial_year: getFYLabel(d.startDate || d.start_date),
+  financial_year: getCalendarYearLabel(d.startDate || d.start_date),
   leave_type_label:
     normalizeLabelValue(d.leaveTypeName) ||
     normalizeLabelValue(d.leave_type_name) ||
@@ -155,27 +154,16 @@ const getCreatedBy = () => {
   return getUserIdFromToken();
 };
 
-const getFinancialYearDates = (financialYear) => {
-  const normalizedYear = String(financialYear || "").trim();
+const getCalendarYearDates = (calendarYear) => {
+  const normalizedYear = String(calendarYear || "").trim();
 
   if (!normalizedYear) {
     return { startDate: "", endDate: "" };
   }
 
-  const [rawStartYear = "", rawEndYear = ""] = normalizedYear.split("-");
-  const startYear = rawStartYear.trim();
-  const endSuffix = rawEndYear.trim();
-
-  if (!startYear || !endSuffix) {
-    return { startDate: "", endDate: "" };
-  }
-
-  const endYear =
-    endSuffix.length === 2 ? `${startYear.slice(0, 2)}${endSuffix}` : endSuffix;
-
   return {
-    startDate: `${startYear}-04-01`,
-    endDate: `${endYear}-03-31`,
+    startDate: `${normalizedYear}-01-01`,
+    endDate: `${normalizedYear}-12-31`,
   };
 };
 
@@ -362,7 +350,7 @@ export default function LeavePolicy() {
       const typeId = formData?.type_id || "";
       const employeeTypeId = formData?.employee_type_id || "";
       const noOfDays = Number(formData?.no_of_days);
-      const { startDate, endDate } = getFinancialYearDates(
+      const { startDate, endDate } = getCalendarYearDates(
         formData?.financial_year,
       );
       const createdBy = getCreatedBy();
@@ -379,7 +367,7 @@ export default function LeavePolicy() {
       }
 
       if (!startDate || !endDate) {
-        setApiError("Invalid financial year selected.");
+        setApiError("Invalid calendar year selected.");
         return;
       }
 
@@ -532,7 +520,7 @@ export default function LeavePolicy() {
             Leave Policy Management
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Define leave entitlements by employee type and financial year
+            Define leave entitlements by employee type and calendar year
           </p>
         </div>
         <button
@@ -657,7 +645,7 @@ export default function LeavePolicy() {
                   "Leave Type",
                   "Employee Type",
                   "No. of Days",
-                  "Financial Year",
+                  "Calendar Year",
                   "Actions",
                 ].map((col) => (
                   <th
@@ -737,7 +725,7 @@ export default function LeavePolicy() {
                     policy.employee_type_label ||
                     resolveLabel(policy.employee_type_id, employeeTypes);
                   const fyLabel =
-                    policy.financial_year || getFYLabel(policy.start_date);
+                    policy.financial_year || getCalendarYearLabel(policy.start_date);
 
                   return (
                     <tr
@@ -794,7 +782,7 @@ export default function LeavePolicy() {
                         </span>
                       </td>
 
-                      {/* Financial Year */}
+                      {/* Calendar Year */}
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <svg

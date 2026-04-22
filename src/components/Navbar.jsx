@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getLoggedInEmpId, getProfile } from "../api/profileApi";
 import { logoutUser } from "../api/authApi";
 import { getUserFromToken } from "../utils/auth";
 import { ROLE_META, ROLES } from "../config/roles.jsx";
+import {
+  shouldForcePasswordReset,
+} from "../utils/authStorage";
+import ResetPasswordForm from "./auth/ResetPasswordForm";
 
 const getInitials = (firstName, lastName, fallback = "") => {
   const first = String(firstName || "").trim().charAt(0);
@@ -24,10 +29,12 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [mustResetPassword, setMustResetPassword] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [profile, setProfile] = useState(null);
   const menuRef = useRef(null);
 
+  const navigate = useNavigate();
   const user = getUserFromToken();
 
   useEffect(() => {
@@ -55,6 +62,12 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
   }, []);
 
   useEffect(() => {
+    const forceReset = shouldForcePasswordReset();
+    setMustResetPassword(forceReset);
+    setShowResetModal(forceReset);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
@@ -64,7 +77,9 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
     const handleEscape = (event) => {
       if (event.key === "Escape") {
         setMenuOpen(false);
-        setShowResetModal(false);
+        if (!mustResetPassword) {
+          setShowResetModal(false);
+        }
       }
     };
 
@@ -75,7 +90,7 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, []);
+  }, [mustResetPassword]);
 
   const firstName =
     profile?.firstName ||
@@ -122,7 +137,13 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
 
   const openResetModal = () => {
     setMenuOpen(false);
-    setShowResetModal(true);
+    navigate("/reset-password");
+  };
+
+  const closeResetModal = () => {
+    if (mustResetPassword) return;
+
+    setShowResetModal(false);
   };
 
   return (
@@ -255,25 +276,20 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
             <div className="px-6 py-5 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">Reset Password</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Password reset UI is ready to be connected when the backend/API is available.
+                {mustResetPassword
+                  ? "You signed in with the default password. Please set a new password to continue."
+                  : "Enter your current password and choose a new one."}
               </p>
             </div>
 
-            <div className="px-6 py-5">
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                This action is not connected yet. Once you have a reset password API or page, we can wire this button directly to it.
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowResetModal(false)}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#1a2240] rounded-xl hover:bg-[#243055] transition-colors"
-              >
-                Close
-              </button>
-            </div>
+            <ResetPasswordForm
+              mustResetPassword={mustResetPassword}
+              onSuccess={() => {
+                setMustResetPassword(false);
+                setShowResetModal(false);
+              }}
+              onCancel={closeResetModal}
+            />
           </div>
         </div>
       )}

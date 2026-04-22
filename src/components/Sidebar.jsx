@@ -29,13 +29,13 @@ const ROUTE_MAP = {
 
   // Employee Management
   "Employee Onboarding": "/employee-onboarding",
-  "Employee Management": "/employee-management",
-  Offboarding: "/offboarding",
+  "Employee List": "/employee-management",
+  "Employee Offboarding": "/offboarding",
 
   // Leave Management
   "Apply Leave": "/leave-management",
-  "My Leaves": "/leave-management",
-  "Team Leaves": "/leave-management",
+  "My Leaves": "/leave-management?tab=my-leaves",
+  "Team Leaves": "/leave-management?tab=team-leaves",
   "Leave Management": "/leave-management",
 
   // My Attendance
@@ -61,6 +61,14 @@ const ROUTE_MAP = {
   "Employee Attendance Report": "/reports/attendance",
 };
 
+const getRouteForLabel = (label, role) => {
+  if (label === "Dashboard") {
+    return role === ROLES.EMPLOYEE ? "/dashboard-employee" : "/dashboard";
+  }
+
+  return ROUTE_MAP[label] || "";
+};
+
 // ─────────────────────────────────────────────
 
 export default function Sidebar({ isOpen = true }) {
@@ -80,6 +88,22 @@ export default function Sidebar({ isOpen = true }) {
   //  Reverse-looks up which label matches the URL
   //  so refresh / direct navigation keeps highlight
   const getActiveFromPath = () => {
+    if (location.pathname === "/dashboard" || location.pathname === "/dashboard-employee") {
+      return "Dashboard";
+    }
+
+    if (location.pathname === "/leave-management") {
+      const tab = new URLSearchParams(location.search).get("tab");
+
+      if (tab === "team-leaves") {
+        return "Team Leaves";
+      }
+
+      if (tab === "my-leaves") {
+        return "My Leaves";
+      }
+    }
+
     const match = Object.entries(ROUTE_MAP).find(
       ([, path]) => path === location.pathname,
     );
@@ -115,7 +139,8 @@ export default function Sidebar({ isOpen = true }) {
   // ── Navigation handler ────────────────────────
   const handleNavigate = (label) => {
     setActiveItem(label);
-    if (ROUTE_MAP[label]) navigate(ROUTE_MAP[label]);
+    const route = getRouteForLabel(label, role);
+    if (route) navigate(route);
   };
 
   // ── Logout ────────────────────────────────────

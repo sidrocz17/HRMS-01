@@ -22,6 +22,13 @@ const httpClient = axios.create({
 let refreshPromise = null;
 let interceptorsInitialized = false;
 
+const isAuthRoute = (url = "") => {
+  const normalizedUrl = String(url || "");
+  return ["/auth/login", "/auth/logout", "/auth/change-password", "/auth/refresh"].some(
+    (path) => normalizedUrl.includes(path)
+  );
+};
+
 const refreshAccessToken = async () => {
   const refreshToken = getRefreshToken();
 
@@ -88,6 +95,10 @@ const attachAuthHeader = (config = {}) => {
 
 const handleAuthError = async (error, client) => {
   const originalRequest = error.config;
+  const token = getAccessToken();
+  const hasAuthorizationHeader = Boolean(
+    originalRequest?.headers?.Authorization || originalRequest?.headers?.authorization
+  );
 
   if (
     error.response?.status !== 401 ||
@@ -97,9 +108,16 @@ const handleAuthError = async (error, client) => {
     throw error;
   }
 
-  if (originalRequest.url?.includes(REFRESH_PATH)) {
+  if (
+    originalRequest.url?.includes(REFRESH_PATH) ||
+    isAuthRoute(originalRequest.url) ||
+    (!token && !hasAuthorizationHeader)
+  ) {
+    throw error;
+  }
+
+  if (!getRefreshToken()) {
     clearSession();
-    logoutAndRedirect();
     throw error;
   }
 

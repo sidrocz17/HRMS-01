@@ -7,13 +7,6 @@ export default function ReviewStep({
   departments = [],
   designations = [],
 }) {
-  const MANAGERS = {
-    "1": "Rajesh Kumar",
-    "2": "Priya Singh",
-    "3": "Amit Patel",
-    "4": "Neha Sharma",
-  };
-
   const departmentLabel =
     departments.find((dept) => String(dept.id) === String(formData.jobDetails.dept_id))
       ?.title || "-";
@@ -92,7 +85,7 @@ export default function ReviewStep({
         <Field label="Employee Type" value={employeeTypeLabel} />
         <Field
           label="Reporting Manager"
-          value={MANAGERS[formData.jobDetails.reporting_manager] || "-"}
+          value="-"
         />
         <Field label="Role" value={roleLabel} />
         <Field

@@ -10,11 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 import ThoughtCard from "../components/attendancePage/ThoughtCard";
 import AttendanceCard from "../components/attendancePage/AttendanceCard";
 import AttendanceTable from "../components/attendancePage/AttendanceTable";
-import {
-  punchIn,
-  punchOut,
-  getAttendance,
-} from "../api/attendanceApi";
+import { punchIn, punchOut, getAttendance } from "../api/attendanceApi";
 import { getRoleFromToken } from "../utils/auth.js";
 
 // ── Status constants ──────────────────────────
@@ -34,7 +30,7 @@ const getLocalDateKey = (value = new Date()) => {
   }
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
+    date.getDate(),
   )}`;
 };
 
@@ -70,7 +66,7 @@ const deriveTodayState = (records = []) => {
   const latestInRecord = sortedRecords.find((record) => record.inISO);
   const latestOutRecord = sortedRecords.find((record) => record.outISO);
   const hasCheckedInToday = todayCandidates.some(
-    (record) => record.inISO || record.outISO
+    (record) => record.inISO || record.outISO,
   );
 
   return {
@@ -78,8 +74,8 @@ const deriveTodayState = (records = []) => {
       latestInRecord?.inISO && latestOutRecord?.outISO
         ? STATUS.COMPLETED
         : hasCheckedInToday
-        ? STATUS.WORKING
-        : STATUS.NOT_STARTED,
+          ? STATUS.WORKING
+          : STATUS.NOT_STARTED,
     hasCheckedInToday,
     todayRecord: hasCheckedInToday
       ? {
@@ -176,8 +172,7 @@ export default function Attendance() {
         status: derivedStatus,
         hasCheckedInToday: derivedHasCheckedInToday,
         todayRecord: derivedRecord,
-      } =
-        deriveTodayState(nextHistory);
+      } = deriveTodayState(nextHistory);
       setStatus(derivedStatus);
       setHasCheckedInToday(derivedHasCheckedInToday);
       setTodayRecord(derivedRecord);
@@ -188,7 +183,7 @@ export default function Attendance() {
           err.response?.data?.error ||
           err.message ||
           "Failed to load attendance.",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -284,9 +279,11 @@ export default function Attendance() {
       </div>
 
       {/* ── Thought of the Day ── */}
-      <div className="mb-5">
-        <ThoughtCard />
-      </div>
+      {isAdminOrHR && (
+        <div className="mb-5">
+          <ThoughtCard />
+        </div>
+      )}
 
       {/* ── Today's card + punch buttons (EMPLOYEE, HR, ADMIN) ── */}
       {(isEmployee || isAdminOrHR) && (

@@ -1,5 +1,6 @@
 const ACCESS_TOKEN_KEY = "token";
 const REFRESH_TOKEN_KEY = "refreshToken";
+const FORCE_PASSWORD_RESET_KEY = "forcePasswordReset";
 
 export const getAccessToken = () =>
   localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem("auth_token");
@@ -20,7 +21,20 @@ export const clearSession = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem("auth_token");
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(FORCE_PASSWORD_RESET_KEY);
 };
 
 export const hasSession = () =>
   Boolean(getAccessToken() || getRefreshToken());
+
+export const setForcePasswordReset = (value) => {
+  if (value) {
+    sessionStorage.setItem(FORCE_PASSWORD_RESET_KEY, "true");
+    return;
+  }
+
+  sessionStorage.removeItem(FORCE_PASSWORD_RESET_KEY);
+};
+
+export const shouldForcePasswordReset = () =>
+  sessionStorage.getItem(FORCE_PASSWORD_RESET_KEY) === "true";

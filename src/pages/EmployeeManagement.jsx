@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import EmployeeTable from "../components/employeeManagement/EmployeeTable";
 import DeactivateModal from "../components/employeeManagement/DeactivateModal";
+import EmployeeRecordsModal from "../components/employeeManagement/EmployeeRecordsModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
 import { getRoleFromToken } from "../utils/auth.js";
 import useEmployee from "../hooks/useEmployee";
@@ -10,6 +11,71 @@ import {
   deactivateEmployee,
   updateEmployeeStatus,
 } from "../api/employeeManagementApi";
+import { getAttendanceByEmployeeId } from "../api/attendanceApi";
+import { fetchLeaveHistory } from "../api/leaveApi";
+import { formatDisplayDate } from "../utils/date";
+
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.data?.data)) return value.data.data;
+  if (Array.isArray(value?.items)) return value.items;
+  return [];
+};
+
+const toTitleCaseStatus = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "Pending";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const normalizeLeaveHistory = (response) =>
+  toArray(response)
+    .map((item, index) => ({
+      id:
+        item.leaveApplicationId ||
+        item.leaveId ||
+        item.id ||
+        item.uuid ||
+        String(index + 1),
+      leave_type:
+        item.leaveType ||
+        item.leaveTypeName ||
+        item.leave_type ||
+        item.typeName ||
+        "Leave",
+      from_date:
+        formatDisplayDate(item.startDate || item.fromDate || item.from_date) || "-",
+      to_date:
+        formatDisplayDate(item.endDate || item.toDate || item.to_date) || "-",
+      days: item.noOfDays ?? item.days ?? 0,
+      status: toTitleCaseStatus(item.status),
+      applied_on:
+        formatDisplayDate(
+          item.appliedOn ||
+            item.appliedDate ||
+            item.createdOn ||
+            item.createdAt ||
+            item.created_on ||
+            item.created_at
+        ) || "-",
+      sort_date:
+        item.startDate ||
+        item.fromDate ||
+        item.from_date ||
+        item.appliedOn ||
+        item.appliedDate ||
+        item.createdOn ||
+        item.createdAt ||
+        item.created_on ||
+        item.created_at ||
+        "",
+    }))
+    .filter((item) => item.id)
+    .sort(
+      (a, b) =>
+        new Date(b.sort_date || 0).getTime() - new Date(a.sort_date || 0).getTime()
+    );
 
 export default function EmployeeManagement() {
   const navigate = useNavigate();
@@ -27,6 +93,11 @@ export default function EmployeeManagement() {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [recordsModalType, setRecordsModalType] = useState("");
+  const [recordsEmployee, setRecordsEmployee] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsError, setRecordsError] = useState("");
 
   const currentUserRole = normalizeRole(getRoleFromToken());
 
@@ -55,6 +126,50 @@ export default function EmployeeManagement() {
   const handleDeactivate = (employee) => {
     setSelectedEmployee(employee);
     setShowDeactivateModal(true);
+  };
+
+  const closeRecordsModal = () => {
+    setRecordsModalType("");
+    setRecordsEmployee(null);
+    setRecords([]);
+    setRecordsLoading(false);
+    setRecordsError("");
+  };
+
+  const openRecordsModal = async (type, employee) => {
+    const employeeId = String(employee?.empId || employee?.emp_id || "").trim();
+
+    setRecordsModalType(type);
+    setRecordsEmployee(employee);
+    setRecords([]);
+    setRecordsLoading(true);
+    setRecordsError("");
+
+    if (!employeeId) {
+      setRecordsError("Employee ID is missing for this record.");
+      setRecordsLoading(false);
+      return;
+    }
+
+    try {
+      if (type === "attendance") {
+        const attendanceRecords = await getAttendanceByEmployeeId(employeeId);
+        setRecords(attendanceRecords);
+      } else {
+        const leaveRecords = await fetchLeaveHistory(employeeId);
+        setRecords(normalizeLeaveHistory(leaveRecords));
+      }
+    } catch (err) {
+      console.error(`❌ Failed to fetch ${type} records:`, err);
+      setRecordsError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          `Failed to load ${type} records`
+      );
+    } finally {
+      setRecordsLoading(false);
+    }
   };
 
   const handleDeactivateConfirm = async (deactivateData) => {
@@ -245,6 +360,8 @@ export default function EmployeeManagement() {
       ) : (
         <EmployeeTable
           employees={filteredEmployees}
+          onViewAttendance={(employee) => openRecordsModal("attendance", employee)}
+          onViewLeaves={(employee) => openRecordsModal("leave", employee)}
           onEdit={handleEdit}
           onDeactivate={handleDeactivate}
           canManage={canManageEmployees}
@@ -263,6 +380,20 @@ export default function EmployeeManagement() {
           loading={loading}
         />
       )}
+
+      <EmployeeRecordsModal
+        isOpen={Boolean(recordsModalType && recordsEmployee)}
+        type={recordsModalType}
+        employeeName={
+          recordsEmployee
+            ? `${recordsEmployee.first_name} ${recordsEmployee.last_name}`.trim()
+            : ""
+        }
+        records={records}
+        isLoading={recordsLoading}
+        error={recordsError}
+        onClose={closeRecordsModal}
+      />
     </div>
   );
 }

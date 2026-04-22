@@ -1,9 +1,14 @@
 import axios from "axios";
-import { getAccessToken, clearSession } from "../utils/authStorage";
+import {
+  getAccessToken,
+  clearSession,
+  setForcePasswordReset,
+} from "../utils/authStorage";
 import { logoutAndRedirect } from "../utils/auth";
 import { buildUrl } from "./apiBase";
 
 const LOGOUT_PATH = buildUrl("/auth/logout");
+const CHANGE_PASSWORD_PATH = buildUrl("/auth/change-password");
 
 const authHeaders = () => {
   const token = getAccessToken();
@@ -31,4 +36,15 @@ export const logoutUser = async () => {
     clearSession();
     logoutAndRedirect();
   }
+};
+
+export const changePassword = async ({ oldPassword, newPassword }) => {
+  const response = await axios.post(
+    CHANGE_PASSWORD_PATH,
+    { oldPassword, newPassword },
+    authHeaders()
+  );
+
+  setForcePasswordReset(false);
+  return response.data;
 };

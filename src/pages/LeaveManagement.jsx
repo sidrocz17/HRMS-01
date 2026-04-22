@@ -224,6 +224,8 @@ export default function LeaveManagement() {
   const [leaveTypes, setLeaveTypes] = useState([]);
 
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyLeaveError, setApplyLeaveError] = useState("");
+  const [isApplyingLeave, setIsApplyingLeave] = useState(false);
   const [showYearlyLeavesModal, setShowYearlyLeavesModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showLeaveDetailsModal, setShowLeaveDetailsModal] = useState(false);
@@ -234,7 +236,7 @@ export default function LeaveManagement() {
   const [leaveDetailsError, setLeaveDetailsError] = useState("");
   const [apiError, setApiError] = useState("");
 
-  const canViewTeamLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
+  const canViewTeamLeaves = role === ROLES.HR;
   const canPostYearlyLeaves = [ROLES.HR, ROLES.ADMIN].includes(role);
 
   const loadLeaveData = useCallback(async () => {
@@ -377,6 +379,8 @@ export default function LeaveManagement() {
   // ── Handlers: Apply Leave ─────────────────────
   const handleApplyLeave = async (formData) => {
     setApiError("");
+    setApplyLeaveError("");
+    setIsApplyingLeave(true);
 
     try {
       const response = await applyLeave(formData);
@@ -386,12 +390,14 @@ export default function LeaveManagement() {
       setShowApplyModal(false);
     } catch (error) {
       console.error("❌ Apply leave failed:", error);
-      setApiError(
+      setApplyLeaveError(
         error?.response?.data?.message ||
           error?.response?.data?.error ||
           error?.message ||
-          "Failed to apply leave",
+          "Failed to apply leave"
       );
+    } finally {
+      setIsApplyingLeave(false);
     }
 
     return;
@@ -500,6 +506,7 @@ export default function LeaveManagement() {
                 setApiError("Employee ID missing. Please log out and log in again.");
                 return;
               }
+              setApplyLeaveError("");
               setShowApplyModal(true);
             }}
             className="flex items-center gap-2 bg-[#1a2240] hover:bg-[#243055] active:scale-95 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150"
@@ -591,11 +598,17 @@ export default function LeaveManagement() {
       {showApplyModal && (
         <ApplyLeaveModal
           onSubmit={handleApplyLeave}
-          onClose={() => setShowApplyModal(false)}
+          onClose={() => {
+            setShowApplyModal(false);
+            setApplyLeaveError("");
+            setIsApplyingLeave(false);
+          }}
           leaveTypes={leaveBalance.map((item) => ({
             id: item.id,
             name: resolveLeaveTypeName(item),
           }))}
+          apiError={applyLeaveError}
+          submitting={isApplyingLeave}
         />
       )}
 

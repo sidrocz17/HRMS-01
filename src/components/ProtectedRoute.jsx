@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────
 
 import { Navigate } from "react-router-dom";
+import { ROLE_REDIRECT } from "../config/roles.jsx";
 import { getUserFromToken } from "../utils/auth.js";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -25,7 +26,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   //  role is in that list. If not → send to dashboard
   //  (they're logged in but not authorized for this page)
   if (allowedRoles && !allowedRoles.includes(role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={ROLE_REDIRECT[role] || "/dashboard"} replace />;
   }
 
   // ── 3. All checks passed → render the page ──

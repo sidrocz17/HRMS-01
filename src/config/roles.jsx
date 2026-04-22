@@ -100,7 +100,7 @@ export const MENU_CONFIG = {
     {
       label: "Leave Management",
       icon: Icons.leave,
-      children: ["Apply Leave", "My Leaves", "Team Leaves"],
+      children: ["My Leaves"]
     },
     {
       label: "My Attendance",
@@ -110,7 +110,7 @@ export const MENU_CONFIG = {
     {
       label: "Employee Management",
       icon: Icons.onboarding,
-      children: ["Employee Management", "Employee Onboarding", "Offboarding"],
+      children: ["Employee List", "Employee Onboarding"],
     },
     {
       label: "Admin",
@@ -125,11 +125,11 @@ export const MENU_CONFIG = {
         "Holiday",
       ],
     },
-    {
-      label: "Payroll Management",
-      icon: Icons.payroll,
-      children: [],
-    },
+    // {
+    //   label: "Payroll Management",
+    //   icon: Icons.payroll,
+    //   children: [],
+    // },
     {
       label: "Reports",
       icon: Icons.reports,
@@ -147,12 +147,12 @@ export const MENU_CONFIG = {
     {
       label: "Employee Management",
       icon: Icons.onboarding,
-      children: ["Employee Management", "Employee Onboarding", "Offboarding"],
+      children: ["Employee List", "Employee Onboarding", "Employee Offboarding"],
     },
     {
       label: "Leave Management",
       icon: Icons.leave,
-      children: ["Apply Leave", "My Leaves", "Team Leaves"],
+      children: [ "My Leaves", "Team Leaves"],
     },
     {
       label: "My Attendance",
@@ -176,18 +176,18 @@ export const MENU_CONFIG = {
     {
       label: "Leave",
       icon: Icons.leave,
-      children: ["Apply Leave", "My Leaves"],
+      children: ["My Leaves"],
     },
     {
       label: "My Attendance",
       icon: Icons.attendance,
       children: ["Attendance Dashboard", "Holiday List"],
     },
-    {
-      label: "Payroll",
-      icon: Icons.payroll,
-      children: [],
-    }
+    // {
+    //   label: "Payroll",
+    //   icon: Icons.payroll,
+    //   children: [],
+    // }
   ],
 };
 
@@ -196,7 +196,7 @@ export const MENU_CONFIG = {
 export const ROLE_REDIRECT = {
   [ROLES.ADMIN]: "/dashboard",
   [ROLES.HR]: "/dashboard",
-  [ROLES.EMPLOYEE]: "/dashboard",
+  [ROLES.EMPLOYEE]: "/dashboard-employee",
 };
 
 // ── 5. Role display labels + badge colors ──────

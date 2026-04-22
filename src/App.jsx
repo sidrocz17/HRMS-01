@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import DashboardEmp from "./pages/DashboardEmp";
 import Departments from "./pages/Departments";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
@@ -21,6 +22,7 @@ import Offboarding from "./pages/Offboarding";
 import MyProfile from "./pages/MyProfile";
 import LeaveReports from "./pages/LeaveReports";
 import AttendanceReports from "./pages/AttendanceReports";
+import ResetPassword from "./pages/ResetPassword";
 import { EmployeeProvider } from "./context/EmployeeContext";
 
 function DashboardLayout({ page }) {
@@ -28,6 +30,7 @@ function DashboardLayout({ page }) {
 
   const pages = {
     dashboard: <Dashboard />,
+    "dashboard-employee": <DashboardEmp />,
     departments: <Departments />,
     designation: <Designations />,
     "leave-types": <LeaveTypes />,
@@ -43,6 +46,7 @@ function DashboardLayout({ page }) {
     "my-profile": <MyProfile />,
     "reports/leave": <LeaveReports />,
     "reports/attendance": <AttendanceReports />,
+    "reset-password": <ResetPassword />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -74,8 +78,16 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
                 <DashboardLayout page="dashboard" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard-employee"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.EMPLOYEE]}>
+                <DashboardLayout page="dashboard-employee" />
               </ProtectedRoute>
             }
           />
@@ -205,6 +217,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.HR]}>
                 <DashboardLayout page="reports/attendance" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout page="reset-password" />
               </ProtectedRoute>
             }
           />

@@ -12,16 +12,24 @@ const Tooltip = ({ text, children }) => (
 
 export default function ActionButtons({
   onView,
+  onAttendance,
+  onLeave,
   onEdit,
   onDelete,
   onMore,
+  viewLabel = "View",
+  attendanceLabel = "Attendance",
+  leaveLabel = "Leave Records",
+  editLabel = "Edit",
+  deleteLabel = "Delete",
   moreLabel = "More",
 }) {
   return (
     <div className="flex items-center gap-1">
 
       {/* View */}
-      <Tooltip text="View">
+      {onView && (
+      <Tooltip text={viewLabel}>
         <button
           onClick={onView}
           className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
@@ -34,9 +42,55 @@ export default function ActionButtons({
           </svg>
         </button>
       </Tooltip>
+      )}
+
+      {/* Attendance */}
+      {onAttendance && (
+      <Tooltip text={attendanceLabel}>
+        <button
+          onClick={onAttendance}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-cyan-700 hover:bg-cyan-50 transition-all duration-150"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+              d="M8 7V3m8 4V3m-9 8l2 2 4-4"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+              d="M4 7h16M5 5h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z"
+            />
+          </svg>
+        </button>
+      </Tooltip>
+      )}
+
+      {/* Leave */}
+      {onLeave && (
+      <Tooltip text={leaveLabel}>
+        <button
+          onClick={onLeave}
+          className="p-1.5 rounded-lg text-gray-400 hover:text-violet-700 hover:bg-violet-50 transition-all duration-150"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+              d="M9 12h6m-6 4h6M9 8h6M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"
+            />
+          </svg>
+        </button>
+      </Tooltip>
+      )}
 
       {/* Edit */}
-      <Tooltip text="Edit">
+      {onEdit && (
+      <Tooltip text={editLabel}>
         <button
           onClick={onEdit}
           className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all duration-150"
@@ -47,9 +101,11 @@ export default function ActionButtons({
           </svg>
         </button>
       </Tooltip>
+      )}
 
       {/* Delete */}
-      <Tooltip text="Delete">
+      {onDelete && (
+      <Tooltip text={deleteLabel}>
         <button
           onClick={onDelete}
           className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
@@ -60,8 +116,10 @@ export default function ActionButtons({
           </svg>
         </button>
       </Tooltip>
+      )}
 
       {/* More */}
+      {onMore && (
       <Tooltip text={moreLabel}>
         <button
           onClick={onMore}
@@ -72,6 +130,7 @@ export default function ActionButtons({
           </svg>
         </button>
       </Tooltip>
+      )}
 
     </div>
   );

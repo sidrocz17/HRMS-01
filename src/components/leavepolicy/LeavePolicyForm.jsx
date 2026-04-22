@@ -2,25 +2,17 @@
 
 import { useState, useEffect } from "react";
 
-// ── Financial year options ────────────────────
-const FINANCIAL_YEARS = [
-  "2022-23",
-  "2023-24",
-  "2024-25",
-  "2025-26",
-  "2026-27",
-];
+// ── Calendar year options ─────────────────────
+const CALENDAR_YEARS = ["2022", "2023", "2024", "2025", "2026", "2027"];
 
-// ── Derive start/end dates from financial year ─
-export const deriveYearDates = (fy) => {
-  if (!fy) return { start_date: "", end_date: "" };
-  const [startYear, endSuffix = ""] = fy.split("-");
-  const endYear =
-    endSuffix.length === 2 ? `${startYear.slice(0, 2)}${endSuffix}` : endSuffix;
+// ── Derive start/end dates from calendar year ─
+export const deriveYearDates = (year) => {
+  const normalizedYear = String(year || "").trim();
+  if (!normalizedYear) return { start_date: "", end_date: "" };
 
   return {
-    start_date: `${startYear}-04-01`,
-    end_date:   `${endYear || Number(startYear) + 1}-03-31`,
+    start_date: `${normalizedYear}-01-01`,
+    end_date: `${normalizedYear}-12-31`,
   };
 };
 
@@ -85,7 +77,7 @@ export default function LeavePolicyForm({
       .includes(key);
 
     if (isDuplicate) {
-      newErrors.financial_year = "A policy for this Leave Type + Employee Type + Financial Year already exists.";
+      newErrors.financial_year = "A policy for this Leave Type + Employee Type + Calendar Year already exists.";
     }
 
     setErrors(newErrors);
@@ -201,10 +193,10 @@ export default function LeavePolicyForm({
             <ErrMsg field="employee_type_id" />
           </div>
 
-          {/* Financial Year */}
+          {/* Calendar Year */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Financial Year <span className="text-red-500">*</span>
+              Calendar Year <span className="text-red-500">*</span>
             </label>
             <select
               value={form.financial_year}
@@ -212,9 +204,9 @@ export default function LeavePolicyForm({
               disabled={submitting}
               className={inputClass("financial_year")}
             >
-              <option value="">Select financial year...</option>
-              {FINANCIAL_YEARS.map((fy) => (
-                <option key={fy} value={fy}>{fy}</option>
+              <option value="">Select calendar year...</option>
+              {CALENDAR_YEARS.map((year) => (
+                <option key={year} value={year}>{year}</option>
               ))}
             </select>
             {/* Show derived dates as hint */}

@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
 import { buildUrl } from "../api/apiBase";
 import { getUserFromToken } from "../utils/auth.js";
+import { setForcePasswordReset } from "../utils/authStorage";
+
+const DEFAULT_PASSWORD = "Emp@123456";
 
 const NetworkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -45,11 +48,11 @@ const EyeIcon = ({ open }) => open ? (
 export default function XcelTechSplitLogin() {
   const [email, setEmail]                   = useState("");
   const [password, setPassword]             = useState("");
-  const [remember, setRemember]             = useState(false);
   const [showPassword, setShowPassword]     = useState(false);
   const [loading, setLoading]               = useState(false);
   const [emailFocused, setEmailFocused]     = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [formError, setFormError]           = useState("");
 
   const navigate = useNavigate();
 
@@ -63,9 +66,10 @@ export default function XcelTechSplitLogin() {
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
     const username = email.trim();
+    setFormError("");
 
     if (!username || !password) {
-      alert("Please enter both username and password.");
+      setFormError("Please enter both username and password.");
       return;
     }
 
@@ -96,6 +100,8 @@ export default function XcelTechSplitLogin() {
         tokenUser.role || data.role || data.user?.role || "admin"
       );
 
+      setForcePasswordReset(password === DEFAULT_PASSWORD);
+
       const redirectPath = ROLE_REDIRECT[userRole] || "/dashboard";
       navigate(redirectPath, { replace: true });
 
@@ -114,11 +120,7 @@ export default function XcelTechSplitLogin() {
         message: error.message,
       });
 
-      if (status === 400) {
-        alert(`${message}\nAPI: ${buildUrl("/auth/login")}`);
-      } else {
-        alert(message);
-      }
+      setFormError(message);
     } finally {
       setLoading(false);
     }
@@ -183,7 +185,10 @@ export default function XcelTechSplitLogin() {
                 type="text"
                 placeholder="username"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (formError) setFormError("");
+                }}
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
                 className="flex-1 ml-2.5 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
@@ -204,7 +209,10 @@ export default function XcelTechSplitLogin() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (formError) setFormError("");
+                }}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
                 className="flex-1 mx-2.5 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
@@ -215,16 +223,11 @@ export default function XcelTechSplitLogin() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 accent-[#1a2240]" />
-              <span className="text-gray-600 text-xs font-medium">Remember me</span>
-            </label>
-            <button type="button" className="text-xs font-semibold" style={{ color: "#E6A800" }}>
-              Reset Password?
-            </button>
-          </div>
+          {formError ? (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {formError}
+            </div>
+          ) : null}
 
           <button
             type="submit"

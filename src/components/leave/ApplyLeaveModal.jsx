@@ -36,6 +36,8 @@ export default function ApplyLeaveModal({
   onSubmit,
   onClose,
   leaveTypes = [],
+  apiError = "",
+  submitting = false,
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
@@ -283,21 +285,29 @@ export default function ApplyLeaveModal({
             />
           </div>
 
+          {apiError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {apiError}
+            </div>
+          ) : null}
+
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100 sticky bottom-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm"
+            disabled={submitting}
+            className="px-5 py-2 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Submit
+            {submitting ? "Submitting..." : "Submit"}
           </button>
         </div>
 

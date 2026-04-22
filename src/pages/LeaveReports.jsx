@@ -17,7 +17,7 @@ import { fetchLeaveTypes }  from "../api/leaveTypeApi";
 // ── CSV export helper ──────────────────────────
 function exportToCSV(data, filename) {
   if (!data.length) return;
-  const headers = ["Employee", "Leave Type", "From Date", "To Date", "Days", "Status", "Applied On"];
+  const headers = ["Employee", "Leave Type", "From Date", "To Date", "Days", "Status"];
   const rows = data.map((r) => [
     r.employee_name,
     r.leave_type,
@@ -25,7 +25,6 @@ function exportToCSV(data, filename) {
     r.to_date,
     r.days,
     r.status,
-    r.applied_on,
   ]);
   const csv = [headers, ...rows].map((row) => row.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -197,7 +196,6 @@ export default function LeaveReports() {
       label:  "Status",
       render: (val) => <StatusBadge status={val} />,
     },
-    { key: "applied_on", label: "Applied On" },
   ];
 
   const handleFilterChange = (key, value) =>
