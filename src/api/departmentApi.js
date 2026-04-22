@@ -39,7 +39,7 @@ export const updateDepartment = async (id, formData) => {
   };
 
   const response = await axios.put(
-    buildApiUrl(`/department/${id}`),
+    buildApiUrl(`/departments/${id}`),
     body,
     authHeaders()
   );
@@ -75,6 +75,15 @@ export const deleteDepartment = async (id) => {
 export const fetchDepartments = async () => {
   const response = await axios.get(
     buildApiUrl("/departments"),
+    authHeaders()
+  );
+  return response.data;
+};
+
+// ── GET /department/:id ───────────────────────
+export const fetchDepartmentById = async (id) => {
+  const response = await axios.get(
+    buildApiUrl(`/departments/${id}`),
     authHeaders()
   );
   return response.data;

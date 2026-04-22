@@ -110,7 +110,7 @@ export const MENU_CONFIG = {
     {
       label: "Employee Management",
       icon: Icons.onboarding,
-      children: ["Employee Management", "Employee Onboarding"],
+      children: ["Employee Management", "Employee Onboarding", "Offboarding"],
     },
     {
       label: "Admin",
@@ -133,7 +133,7 @@ export const MENU_CONFIG = {
     {
       label: "Reports",
       icon: Icons.reports,
-      children: ["Employee Report", "Attendance Report", "Performance Report"],
+      children: ["Employee Leave Report", "Employee Attendance Report"],
     },
   ],
 
@@ -147,7 +147,7 @@ export const MENU_CONFIG = {
     {
       label: "Employee Management",
       icon: Icons.onboarding,
-      children: ["Employee Management"],
+      children: ["Employee Management", "Employee Onboarding", "Offboarding"],
     },
     {
       label: "Leave Management",
@@ -162,7 +162,7 @@ export const MENU_CONFIG = {
     {
       label: "Reports",
       icon: Icons.reports,
-      children: ["Employee Report", "Attendance Report"],
+      children: ["Employee Leave Report", "Employee Attendance Report"],
     },
   ],
 
@@ -187,7 +187,7 @@ export const MENU_CONFIG = {
       label: "Payroll",
       icon: Icons.payroll,
       children: [],
-    },
+    }
   ],
 };
 

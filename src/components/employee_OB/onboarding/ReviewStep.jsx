@@ -1,21 +1,12 @@
 // src/components/employee/onboarding/ReviewStep.jsx
-export default function ReviewStep({ formData, employeeTypes = [] }) {
-  const DEPARTMENTS = {
-    "1": "Engineering",
-    "2": "Sales",
-    "3": "Marketing",
-    "4": "HR",
-    "5": "Finance",
-  };
+import { ROLES } from "../../../config/roles.jsx";
 
-  const DESIGNATIONS = {
-    "1": "Junior Engineer",
-    "2": "Senior Engineer",
-    "3": "Sales Executive",
-    "4": "Manager",
-    "5": "Director",
-  };
-
+export default function ReviewStep({
+  formData,
+  employeeTypes = [],
+  departments = [],
+  designations = [],
+}) {
   const MANAGERS = {
     "1": "Rajesh Kumar",
     "2": "Priya Singh",
@@ -23,9 +14,22 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
     "4": "Neha Sharma",
   };
 
+  const departmentLabel =
+    departments.find((dept) => String(dept.id) === String(formData.jobDetails.dept_id))
+      ?.title || "-";
+  const designationLabel =
+    designations.find(
+      (desig) => String(desig.id) === String(formData.jobDetails.desig_id)
+    )?.title || "-";
   const employeeTypeLabel =
     employeeTypes.find((t) => String(t.id) === String(formData.jobDetails.employee_type_id))
       ?.title || "-";
+  const roleLabel =
+    {
+      [ROLES.ADMIN]: "ADMIN",
+      [ROLES.EMPLOYEE]: "EMPLOYEE",
+      [ROLES.HR]: "HR",
+    }[formData.jobDetails.role] || "-";
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -74,24 +78,23 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
         />
         <Field label="Email" value={formData.basicInfo.email} />
         <Field label="Phone" value={formData.basicInfo.phone} />
+        <Field
+          label="Date of Birth"
+          value={formatDate(formData.basicInfo.date_of_birth)}
+        />
         <Field label="Address" value={formData.basicInfo.address} />
       </Section>
 
       {/* Job Details */}
       <Section title="Job Details">
-        <Field
-          label="Department"
-          value={DEPARTMENTS[formData.jobDetails.dept_id] || "-"}
-        />
-        <Field
-          label="Designation"
-          value={DESIGNATIONS[formData.jobDetails.desig_id] || "-"}
-        />
+        <Field label="Department" value={departmentLabel} />
+        <Field label="Designation" value={designationLabel} />
         <Field label="Employee Type" value={employeeTypeLabel} />
         <Field
           label="Reporting Manager"
           value={MANAGERS[formData.jobDetails.reporting_manager] || "-"}
         />
+        <Field label="Role" value={roleLabel} />
         <Field
           label="Joining Date"
           value={formatDate(formData.jobDetails.join_date)}
@@ -116,87 +119,6 @@ export default function ReviewStep({ formData, employeeTypes = [] }) {
           {formData.identity.passport_num && (
             <Field label="Passport" value={formData.identity.passport_num} />
           )}
-        </Section>
-      )}
-
-      {/* Previous Employment */}
-      {formData.previousEmployment.some((emp) => emp.company_name) && (
-        <Section title="Previous Employment">
-          {formData.previousEmployment.map((emp, idx) => (
-            emp.company_name && (
-              <div key={idx} className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="font-medium text-gray-900">
-                    {emp.company_name}
-                  </span>
-                  <span className="text-xs text-gray-500">Job #{idx + 1}</span>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Position:</span>
-                    <span className="font-medium text-gray-900">
-                      {emp.job_title}
-                    </span>
-                  </div>
-                  {emp.start_date && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Duration:</span>
-                      <span className="font-medium text-gray-900">
-                        {formatDate(emp.start_date)} to{" "}
-                        {formatDate(emp.end_date)}
-                      </span>
-                    </div>
-                  )}
-                  {emp.reason_for_leaving && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Reason:</span>
-                      <span className="font-medium text-gray-900">
-                        {emp.reason_for_leaving}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          ))}
-        </Section>
-      )}
-
-      {/* Documents */}
-      {Object.values(formData.documents).some((doc) => doc) && (
-        <Section title="Documents">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {formData.documents.pan_card && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">✓</span>
-                <span className="text-gray-900">PAN Card Uploaded</span>
-              </div>
-            )}
-            {formData.documents.aadhar_card && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">✓</span>
-                <span className="text-gray-900">Aadhaar Card Uploaded</span>
-              </div>
-            )}
-            {formData.documents.passport && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">✓</span>
-                <span className="text-gray-900">Passport Uploaded</span>
-              </div>
-            )}
-            {formData.documents.offer_letter && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">✓</span>
-                <span className="text-gray-900">Offer Letter Uploaded</span>
-              </div>
-            )}
-            {formData.documents.resume && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-green-600">✓</span>
-                <span className="text-gray-900">Resume Uploaded</span>
-              </div>
-            )}
-          </div>
         </Section>
       )}
 

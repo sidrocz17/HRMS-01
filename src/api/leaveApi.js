@@ -14,6 +14,41 @@ const authHeaders = () => ({
   },
 });
 
+const asObject = (value) =>
+  value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+const hasLeaveDetailsShape = (value) => {
+  const candidate = asObject(value);
+
+  return Boolean(
+    candidate.leaveApplicationId ||
+      candidate.leaveType ||
+      candidate.startDate ||
+      candidate.endDate ||
+      candidate.status ||
+      candidate.employeeName ||
+      candidate.approver ||
+      candidate.denier
+  );
+};
+
+const normalizeLeaveDetailsResponse = (payload) => {
+  const root = asObject(payload);
+  const data = asObject(root.data);
+  const candidates = [
+    root,
+    data,
+    asObject(root.leave),
+    asObject(data.leave),
+    asObject(root.result),
+    asObject(data.result),
+    asObject(root.payload),
+    asObject(data.payload),
+  ];
+
+  return candidates.find(hasLeaveDetailsShape) || root;
+};
+
 // ── POST /leaves/apply — Apply for leave ──────
 export const applyLeave = async (formData) => {
   const body = {
@@ -67,6 +102,16 @@ export const fetchTeamLeaves = async () => {
   return response.data;
 };
 
+// ── GET /leaves/summary — Get leave summary ──
+export const fetchLeaveSummary = async () => {
+  const response = await axios.get(
+    buildApiUrl("/leaves/summary"),
+    authHeaders()
+  );
+
+  return response.data;
+};
+
 // ── GET /leaves/:id — Get leave details ──────
 export const fetchLeaveDetails = async (id) => {
   const response = await axios.get(
@@ -74,7 +119,7 @@ export const fetchLeaveDetails = async (id) => {
     authHeaders()
   );
 
-  return response.data;
+  return normalizeLeaveDetailsResponse(response.data);
 };
 
 // ── PUT /leaves/:id/approve — Approve leave ──
@@ -185,7 +230,7 @@ export const postYearlyLeavesForAllEmployees = async (year) => {
   }
 
   const response = await axios.post(
-    buildApiUrl("/credit-yearly"),
+    buildApiUrl("leaves/credit-yearly"),
     {},
     {
       ...authHeaders(),

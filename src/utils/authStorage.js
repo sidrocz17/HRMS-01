@@ -1,7 +1,5 @@
 const ACCESS_TOKEN_KEY = "token";
 const REFRESH_TOKEN_KEY = "refreshToken";
-const ROLE_KEY = "role";
-const USER_KEY = "user";
 
 export const getAccessToken = () =>
   localStorage.getItem(ACCESS_TOKEN_KEY) || localStorage.getItem("auth_token");
@@ -22,8 +20,6 @@ export const clearSession = () => {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem("auth_token");
   localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(ROLE_KEY);
-  localStorage.removeItem(USER_KEY);
 };
 
 export const hasSession = () =>

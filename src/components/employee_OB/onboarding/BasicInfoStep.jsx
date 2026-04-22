@@ -85,6 +85,21 @@ export default function BasicInfoStep({ data, errors, onChange }) {
             />
             <ErrorMsg field="phone" />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Date of Birth <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={data.date_of_birth}
+              onChange={(e) =>
+                onChange("basicInfo", "date_of_birth", e.target.value)
+              }
+              className={inputClass("date_of_birth")}
+            />
+            <ErrorMsg field="date_of_birth" />
+          </div>
         </div>
 
         <div className="mt-4">

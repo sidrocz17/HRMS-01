@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from "react";
 import AttendancePolicyForm from "../components/attendance/AttendancePolicyForm";
-import { normalizeRole } from "../config/roles.jsx";
+import { getRoleFromToken, getUserFromToken } from "../utils/auth.js";
 import {
   createAttendancePolicy,
   deleteAttendancePolicy,
@@ -17,6 +17,8 @@ import {
   fetchAttendancePolicyHistory,
   updateAttendancePolicy,
 } from "../api/attendancePolicyApi";
+import { fetchUsers } from "../api/userApi";
+import { getEmployees } from "../api/employeeManagementApi";
 
 const Tooltip = ({ text, children }) => (
   <div className="relative group">
@@ -74,6 +76,82 @@ const formatDate = (dateStr) => {
   });
 };
 
+const firstFilled = (...values) =>
+  values.find(
+    (value) => value !== undefined && value !== null && String(value).trim() !== ""
+  );
+
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.data?.data)) return value.data.data;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.content)) return value.content;
+  if (Array.isArray(value?.results)) return value.results;
+  if (Array.isArray(value?.payload)) return value.payload;
+  return [];
+};
+
+const getUserDisplayName = (user = {}) => {
+  const firstName = firstFilled(
+    user.firstName,
+    user.first_name,
+    user.firstname
+  );
+  const lastName = firstFilled(
+    user.lastName,
+    user.last_name,
+    user.lastname
+  );
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return (
+    fullName ||
+    firstFilled(
+      user.name,
+      user.fullName,
+      user.full_name,
+      user.displayName,
+      user.display_name,
+      user.employeeName,
+      user.employee_name,
+      user.userName,
+      user.username,
+      user.email
+    ) ||
+    ""
+  );
+};
+
+const getEmployeeDisplayName = (employee = {}) => {
+  const firstName = firstFilled(
+    employee.firstName,
+    employee.first_name,
+    employee.firstname
+  );
+  const lastName = firstFilled(
+    employee.lastName,
+    employee.last_name,
+    employee.lastname
+  );
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return (
+    fullName ||
+    firstFilled(
+      employee.name,
+      employee.fullName,
+      employee.full_name,
+      employee.employeeName,
+      employee.employee_name,
+      employee.displayName,
+      employee.display_name,
+      employee.email
+    ) ||
+    ""
+  );
+};
+
 // ── Policy field card ─────────────────────────
 const PolicyField = ({ icon, label, value }) => (
   <div className="flex flex-col gap-1">
@@ -119,15 +197,9 @@ const TH = ({ icon, label }) => (
 
 export default function AttendancePolicy() {
   // ── RBAC ──────────────────────────────────────
-  const role    = normalizeRole(localStorage.getItem("role"));
+  const role = getRoleFromToken();
   const isAdmin = role === "admin";
-  const currentUser = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "{}");
-    } catch {
-      return {};
-    }
-  })();
+  const currentUser = getUserFromToken();
 
   // ── State ─────────────────────────────────────
   const [policy, setPolicy]     = useState(null);
@@ -144,18 +216,114 @@ export default function AttendancePolicy() {
   };
 
   const currentUserLabel = (() => {
-    const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(" ").trim();
-    return fullName || currentUser.email || localStorage.getItem("role") || "Current Admin";
+    const claims = currentUser.claims || {};
+    return (
+      firstFilled(
+        claims.name,
+        claims.fullName,
+        claims.full_name,
+        claims.preferred_username,
+        claims.username,
+        claims.userName,
+        currentUser.empId,
+        currentUser.userId
+      ) ||
+      role ||
+      "Current Admin"
+    );
   })();
 
   const isUuidLike = (value) =>
     typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+    (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim()) ||
+      /^[0-9a-f]{32}$/i.test(value.trim())
+    );
 
-  const resolveUpdatedBy = (...values) => {
-    const resolved = values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+  const normalizeIdentityKey = (value) => String(value).trim().toLowerCase();
+
+  const getIdentityValues = (...sources) =>
+    sources.flatMap((source) =>
+      [
+        source?.id,
+        source?.userId,
+        source?.user_id,
+        source?.uuid,
+        source?.empId,
+        source?.emp_id,
+        source?.employeeId,
+        source?.employee_id,
+        source?.loginId,
+        source?.login_id,
+      ].filter(
+        (value) =>
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() !== ""
+      )
+    );
+
+  const buildUserNameMap = (users = []) => {
+    const entries = users.flatMap((user) => {
+      const sources = [
+        user,
+        user?.user || {},
+        user?.employee || {},
+        user?.data || {},
+      ];
+      const label =
+        getUserDisplayName(user) ||
+        getUserDisplayName(user?.user || {}) ||
+        getEmployeeDisplayName(user?.employee || {});
+      if (!label) return [];
+
+      return getIdentityValues(...sources).map((value) => [
+        normalizeIdentityKey(value),
+        label,
+      ]);
+    });
+
+    return new Map(entries);
+  };
+
+  const buildEmployeeNameMap = (employees = []) => {
+    const entries = employees.flatMap((employee) => {
+      const sources = [
+        employee,
+        employee?.user || {},
+        employee?.employee || {},
+        employee?.data || {},
+      ];
+      const label =
+        getEmployeeDisplayName(employee) ||
+        getEmployeeDisplayName(employee?.employee || {}) ||
+        getUserDisplayName(employee?.user || {});
+      if (!label) return [];
+
+      return getIdentityValues(...sources).map((value) => [
+        normalizeIdentityKey(value),
+        label,
+      ]);
+    });
+
+    return new Map(entries);
+  };
+
+  const resolveUpdatedBy = (identityNameMap, ...values) => {
+    const resolved = values.find(
+      (value) => value !== undefined && value !== null && String(value).trim() !== ""
+    );
+
     if (!resolved) return currentUserLabel;
-    return isUuidLike(resolved) ? currentUserLabel : resolved;
+
+    const normalizedResolved = String(resolved).trim();
+    const normalizedKey = normalizeIdentityKey(normalizedResolved);
+
+    if (identityNameMap?.has(normalizedKey)) {
+      return identityNameMap.get(normalizedKey);
+    }
+
+    return isUuidLike(normalizedResolved) ? "Unknown User" : normalizedResolved;
   };
 
   const hasPolicyValues = (item) => {
@@ -185,7 +353,7 @@ export default function AttendancePolicy() {
     return [...records].reverse().find(hasPolicyValues) || records[records.length - 1] || null;
   };
 
-  const normalizePolicy = (item) => {
+  const normalizePolicy = (item, userNameMap) => {
     if (!item) return null;
 
     return {
@@ -204,6 +372,7 @@ export default function AttendancePolicy() {
         "",
       updatedBy:
         resolveUpdatedBy(
+          userNameMap,
           item.updatedBy,
           item.updated_by,
           item.createdBy,
@@ -218,8 +387,8 @@ export default function AttendancePolicy() {
     };
   };
 
-  const toHistoryRow = (item) => {
-    const normalized = normalizePolicy(item);
+  const toHistoryRow = (item, userNameMap) => {
+    const normalized = normalizePolicy(item, userNameMap);
     if (!normalized) return null;
 
     return {
@@ -233,7 +402,7 @@ export default function AttendancePolicy() {
     };
   };
 
-  const normalizeHistoryRow = (item) => {
+  const normalizeHistoryRow = (item, userNameMap) => {
     if (!item) return null;
 
     return {
@@ -247,6 +416,7 @@ export default function AttendancePolicy() {
         "",
       updatedBy:
         resolveUpdatedBy(
+          userNameMap,
           item.updatedBy,
           item.updated_by,
           item.createdBy,
@@ -275,18 +445,33 @@ export default function AttendancePolicy() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [policyData, historyData] = await Promise.all([
+      const [policyData, historyData, usersData, employeesData] = await Promise.all([
         fetchAttendancePolicy(),
         fetchAttendancePolicyHistory(),
+        fetchUsers().catch((error) => {
+          console.error("❌ Failed to load users for attendance policy names:", error);
+          return [];
+        }),
+        getEmployees().catch((error) => {
+          console.error("❌ Failed to load employees for attendance policy names:", error);
+          return [];
+        }),
+      ]);
+      const identityNameMap = new Map([
+        ...buildUserNameMap(toArray(usersData)).entries(),
+        ...buildEmployeeNameMap(toArray(employeesData)).entries(),
       ]);
       const liveRows = getPolicyRecords(policyData)
         .filter(hasPolicyValues)
         .reverse()
-        .map(normalizeHistoryRow)
+        .map((item) => normalizeHistoryRow(item, identityNameMap))
         .filter(Boolean);
-      const currentPolicy = normalizePolicy(getPolicyRecord(policyData));
+      const currentPolicy = normalizePolicy(
+        getPolicyRecord(policyData),
+        identityNameMap
+      );
       const normalizedHistory = (Array.isArray(historyData) ? historyData : [])
-        .map(normalizeHistoryRow)
+        .map((item) => normalizeHistoryRow(item, identityNameMap))
         .filter(Boolean);
       const mergedHistory = liveRows.length > 0 ? liveRows : normalizedHistory;
 
@@ -307,7 +492,13 @@ export default function AttendancePolicy() {
     setApiError("");
     try {
       if (editTarget) {
-        await updateAttendancePolicy(formData);
+        const attPolicyId = editTarget.id || policy?.id;
+
+        if (!attPolicyId) {
+          throw new Error("Attendance policy ID is required for update.");
+        }
+
+        await updateAttendancePolicy(attPolicyId, formData);
       } else {
         await createAttendancePolicy(formData);
       }

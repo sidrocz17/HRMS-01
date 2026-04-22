@@ -5,6 +5,7 @@ import {
   getRefreshToken,
   setSessionTokens,
 } from "../utils/authStorage";
+import { isTokenExpired, logoutAndRedirect } from "../utils/auth";
 import { BASE_URL, buildUrl } from "./apiBase";
 
 const REFRESH_PATH = buildUrl(
@@ -19,21 +20,7 @@ const httpClient = axios.create({
 });
 
 let refreshPromise = null;
-
-const decodeJwtPayload = (token) => {
-  try {
-    const [, payload = ""] = token.split(".");
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "="
-    );
-
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
-};
+let interceptorsInitialized = false;
 
 const refreshAccessToken = async () => {
   const refreshToken = getRefreshToken();
@@ -71,6 +58,7 @@ const refreshAccessToken = async () => {
       })
       .catch((error) => {
         clearSession();
+        logoutAndRedirect();
         throw error;
       })
       .finally(() => {
@@ -81,52 +69,66 @@ const refreshAccessToken = async () => {
   return refreshPromise;
 };
 
-httpClient.interceptors.request.use((config) => {
+const attachAuthHeader = (config = {}) => {
   const token = getAccessToken();
 
+  if (token && isTokenExpired(token)) {
+    clearSession();
+    logoutAndRedirect();
+    return Promise.reject(new Error("Session expired. Please log in again."));
+  }
+
   if (token) {
+    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  if (config.url?.includes("/employment-type")) {
-    const tokenPayload = token ? decodeJwtPayload(token) : null;
-
-    console.log("🌐 Employment type request", {
-      url: config.url,
-      method: config.method,
-      headers: config.headers,
-      hasToken: Boolean(token),
-      tokenPayload,
-    });
-  }
-
   return config;
-});
+};
 
-httpClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+const handleAuthError = async (error, client) => {
+  const originalRequest = error.config;
 
-    if (
-      error.response?.status !== 401 ||
-      !originalRequest ||
-      originalRequest._retry
-    ) {
-      throw error;
-    }
-
-    if (originalRequest.url?.includes(REFRESH_PATH)) {
-      clearSession();
-      throw error;
-    }
-
-    originalRequest._retry = true;
-
-    const nextAccessToken = await refreshAccessToken();
-    originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`;
-    return httpClient(originalRequest);
+  if (
+    error.response?.status !== 401 ||
+    !originalRequest ||
+    originalRequest._retry
+  ) {
+    throw error;
   }
-);
+
+  if (originalRequest.url?.includes(REFRESH_PATH)) {
+    clearSession();
+    logoutAndRedirect();
+    throw error;
+  }
+
+  originalRequest._retry = true;
+
+  try {
+    const nextAccessToken = await refreshAccessToken();
+    originalRequest.headers = originalRequest.headers || {};
+    originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`;
+    return client(originalRequest);
+  } catch (refreshError) {
+    clearSession();
+    logoutAndRedirect();
+    throw refreshError;
+  }
+};
+
+export const setupAuthInterceptors = () => {
+  if (interceptorsInitialized) return;
+
+  [axios, httpClient].forEach((client) => {
+    client.interceptors.request.use(attachAuthHeader);
+    client.interceptors.response.use(
+      (response) => response,
+      (error) => handleAuthError(error, client)
+    );
+  });
+
+  interceptorsInitialized = true;
+};
 
 export default httpClient;

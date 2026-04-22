@@ -1,90 +1,26 @@
 // src/pages/EmployeeManagement.jsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import EmployeeTable from "../components/employeeManagement/EmployeeTable";
 import DeactivateModal from "../components/employeeManagement/DeactivateModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
+import { getRoleFromToken } from "../utils/auth.js";
+import useEmployee from "../hooks/useEmployee";
 import {
   deactivateEmployee,
-  getEmployees,
   updateEmployeeStatus,
 } from "../api/employeeManagementApi";
 
-const pickEmployeeList = (payload) => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.employees)) return payload.employees;
-  if (Array.isArray(payload?.results)) return payload.results;
-  return [];
-};
-
-const normalizeEmployee = (employee = {}) => {
-  const department = employee.department || employee.department_details || {};
-  const designation =
-    employee.designation || employee.designation_details || {};
-
-  return {
-    ...employee,
-    emp_id:
-      employee.emp_id ||
-      employee.employee_id ||
-      employee.empId ||
-      employee.id ||
-      "",
-    first_name:
-      employee.first_name || employee.firstName || employee.firstname || "",
-    last_name:
-      employee.last_name || employee.lastName || employee.lastname || "",
-    email: employee.email || employee.email_id || employee.work_email || "",
-    department: {
-      ...department,
-      deptName:
-        department.deptName ||
-        department.department_name ||
-        department.name ||
-        employee.department_name ||
-        employee.departmentName ||
-        "-",
-    },
-    designation: {
-      ...designation,
-      title:
-        designation.title ||
-        designation.designation_name ||
-        designation.name ||
-        employee.designation_name ||
-        employee.designationTitle ||
-        "-",
-    },
-    join_date:
-      employee.join_date ||
-      employee.joinDate ||
-      employee.joining_date ||
-      employee.date_of_joining ||
-      employee.created_at ||
-      null,
-    is_active:
-      typeof employee.is_active === "boolean"
-        ? employee.is_active
-        : typeof employee.isActive === "boolean"
-        ? employee.isActive
-        : typeof employee.status === "string"
-        ? employee.status.toLowerCase() === "active"
-        : Boolean(employee.user_active ?? employee.userActive ?? true),
-    user_active:
-      typeof employee.user_active === "boolean"
-        ? employee.user_active
-        : typeof employee.userActive === "boolean"
-        ? employee.userActive
-        : true,
-  };
-};
-
 export default function EmployeeManagement() {
   const navigate = useNavigate();
+  const {
+    employees,
+    setEmployees,
+    loading: employeeLoading,
+    error: employeeError,
+  } = useEmployee();
 
   // State
-  const [employees, setEmployees] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -92,7 +28,7 @@ export default function EmployeeManagement() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const currentUserRole = normalizeRole(localStorage.getItem("role"));
+  const currentUserRole = normalizeRole(getRoleFromToken());
 
   // Filtered employees based on search and status
   const filteredEmployees = employees.filter((emp) => {
@@ -109,35 +45,9 @@ export default function EmployeeManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  // Fetch employees (TODO: Integrate API)
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await getEmployees();
-        const employeeList = pickEmployeeList(response).map(normalizeEmployee);
-        setEmployees(employeeList);
-      } catch (err) {
-        console.error("❌ Error fetching employees:", err);
-        const message =
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to load employees";
-        setError(message);
-        setEmployees([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEmployees();
-  }, []);
-
   const handleEdit = (employee) => {
     console.log("✏️ Edit employee:", employee);
-    navigate(`/employee-onboarding?mode=edit&id=${employee.emp_id}`, {
+    navigate(`/employee-onboarding?mode=edit&id=${employee.empId}`, {
       state: { employee },
     });
   };
@@ -155,14 +65,14 @@ export default function EmployeeManagement() {
 
     try {
       if (!deactivateData.employeeActive) {
-        await deactivateEmployee(selectedEmployee.emp_id);
+        await deactivateEmployee(selectedEmployee.empId);
       } else {
-        await updateEmployeeStatus(selectedEmployee.emp_id, deactivateData);
+        await updateEmployeeStatus(selectedEmployee.empId, deactivateData);
       }
 
       setEmployees((prev) =>
         prev.map((emp) =>
-          emp.emp_id === selectedEmployee.emp_id
+          emp.empId === selectedEmployee.empId
             ? {
                 ...emp,
                 is_active: deactivateData.employeeActive,
@@ -201,7 +111,7 @@ export default function EmployeeManagement() {
       </div>
 
       {/* Error Message */}
-      {error && (
+      {(error || employeeError) && (
         <div className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
           <svg
             className="w-5 h-5 flex-shrink-0"
@@ -214,7 +124,7 @@ export default function EmployeeManagement() {
               clipRule="evenodd"
             />
           </svg>
-          {error}
+          {error || employeeError}
         </div>
       )}
 
@@ -287,7 +197,7 @@ export default function EmployeeManagement() {
       </div>
 
       {/* Table */}
-      {loading ? (
+      {employeeLoading ? (
         <div className="flex items-center justify-center py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="text-center">
             <svg

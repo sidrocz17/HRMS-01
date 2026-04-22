@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────
 
 import { useState } from "react";
+import { getUserFromToken } from "../../utils/auth";
 
 const StatusBadge = ({ status }) => {
   const normalizedStatus = (() => {
@@ -47,8 +48,9 @@ const Tooltip = ({ text, children }) => (
   </div>
 );
 
-export default function TeamLeaveTable({ data, role, onApprove }) {
+export default function TeamLeaveTable({ data, role, onApprove, onView }) {
   const [search, setSearch] = useState("");
+  const user = getUserFromToken();
 
   const filtered = data.filter(
     (leave) =>
@@ -121,6 +123,16 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
               </tr>
             ) : (
               filtered.map((leave) => (
+                (() => {
+                  const isOwnLeave =
+                    Boolean(leave?.is_own_leave) ||
+                    (
+                      String(user?.empId || "").trim() !== "" &&
+                      String(user?.empId || "").trim() ===
+                        String(leave?.employee_id || "").trim()
+                    );
+
+                  return (
                 <tr
                   key={leave.id}
                   className="group hover:bg-gray-50/80 transition-colors duration-100"
@@ -181,13 +193,54 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
                   {/* Actions */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1">
+                      <Tooltip text="View Details">
+                        <button
+                          onClick={() => onView?.(leave)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-all duration-150"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.8}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.8}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7S3.732 16.057 2.458 12z"
+                            />
+                          </svg>
+                        </button>
+                      </Tooltip>
+
                       {/* Approve (only for Pending) */}
                       {String(leave.status || "").trim().toLowerCase() === "pending" && (
                         <>
-                          <Tooltip text="Approve">
+                          <Tooltip
+                            text={
+                              isOwnLeave
+                                ? "You cannot approve your own leave"
+                                : "Approve"
+                            }
+                          >
                             <button
-                              onClick={() => onApprove(leave, "approve")}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-150"
+                              onClick={() => {
+                                if (isOwnLeave) return;
+                                onApprove(leave, "approve");
+                              }}
+                              disabled={isOwnLeave}
+                              className={`p-1.5 rounded-lg transition-all duration-150 ${
+                                isOwnLeave
+                                  ? "cursor-not-allowed text-gray-300"
+                                  : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+                              }`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -196,10 +249,24 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
                             </button>
                           </Tooltip>
 
-                          <Tooltip text="Reject">
+                          <Tooltip
+                            text={
+                              isOwnLeave
+                                ? "You cannot approve your own leave"
+                                : "Reject"
+                            }
+                          >
                             <button
-                              onClick={() => onApprove(leave, "reject")}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
+                              onClick={() => {
+                                if (isOwnLeave) return;
+                                onApprove(leave, "reject");
+                              }}
+                              disabled={isOwnLeave}
+                              className={`p-1.5 rounded-lg transition-all duration-150 ${
+                                isOwnLeave
+                                  ? "cursor-not-allowed text-gray-300"
+                                  : "text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              }`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -212,6 +279,8 @@ export default function TeamLeaveTable({ data, role, onApprove }) {
                     </div>
                   </td>
                 </tr>
+                  );
+                })()
               ))
             )}
           </tbody>

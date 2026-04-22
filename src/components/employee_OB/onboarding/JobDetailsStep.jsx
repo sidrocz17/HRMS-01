@@ -1,4 +1,6 @@
 // src/components/employee/onboarding/JobDetailsStep.jsx
+import { ROLES } from "../../../config/roles.jsx";
+
 const DEPARTMENTS = [
   { id: "1", title: "Engineering" },
   { id: "2", title: "Sales" },
@@ -20,6 +22,12 @@ const MANAGERS = [
   { id: "2", name: "Priya Singh" },
   { id: "3", name: "Amit Patel" },
   { id: "4", name: "Neha Sharma" },
+];
+
+const ROLE_OPTIONS = [
+  { value: ROLES.ADMIN, label: "ADMIN" },
+  { value: ROLES.EMPLOYEE, label: "EMPLOYEE" },
+  { value: ROLES.HR, label: "HR" },
 ];
 
 export default function JobDetailsStep({
@@ -88,8 +96,11 @@ export default function JobDetailsStep({
               value={data.desig_id}
               onChange={(e) => onChange("jobDetails", "desig_id", e.target.value)}
               className={inputClass("desig_id")}
+              disabled={!data.dept_id}
             >
-              <option value="">Select designation</option>
+              <option value="">
+                {data.dept_id ? "Select designation" : "Select department first"}
+              </option>
               {designations.map((desig) => (
                 <option key={desig.id} value={desig.id}>
                   {desig.title}
@@ -120,7 +131,26 @@ export default function JobDetailsStep({
             <ErrorMsg field="employee_type_id" />
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Role <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={data.role}
+              onChange={(e) => onChange("jobDetails", "role", e.target.value)}
+              className={inputClass("role")}
+            >
+              <option value="">Select role</option>
+              {ROLE_OPTIONS.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
+            <ErrorMsg field="role" />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Reporting Manager <span className="text-red-500">*</span>
             </label>

@@ -7,23 +7,19 @@
 
 import axios from "axios";
 import { buildApiUrl } from "./apiBase";
+import { getToken, getUserIdFromToken } from "../utils/auth.js";
 const DEFAULT_HOLIDAY_TYPE = "National Holiday";
 
 const authHeaders = () => ({
   headers: {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
+    Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
   },
 });
 
 // ── Helper: get logged-in user UUID ──────────
 const getUserId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    return user.id || user.userId || "";
-  } catch {
-    return "";
-  }
+  return getUserIdFromToken();
 };
 
 const isHolidayActive = (holiday) => {

@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { createEmployee } from "../api/employeeApi";
 import { getEmployeeById, updateEmployee } from "../api/employeeManagementApi";
 import { fetchDepartments } from "../api/departmentApi";
+import { getMappedDesignations } from "../api/deptDesigApi";
 import { fetchDesignations } from "../api/designationApi";
 import { fetchEmployeeTypes } from "../api/employeeTypeApi";
 import { allocateEmployeeLeaves } from "../api/leaveApi";
@@ -12,19 +13,17 @@ import Stepper from "../components/employee_OB/onboarding/Stepper";
 import BasicInfoStep from "../components/employee_OB/onboarding/BasicInfoStep";
 import JobDetailsStep from "../components/employee_OB/onboarding/JobDetailsStep";
 import IdentityStep from "../components/employee_OB/onboarding/IdentityStep";
-import PreviousEmploymentStep from "../components/employee_OB/onboarding/PreviousEmploymentStep";
-import DocumentUploadStep from "../components/employee_OB/onboarding/DocumentUploadStep";
 import ReviewStep from "../components/employee_OB/onboarding/ReviewStep";
 import SuccessModal from "../components/modals/SuccessModal";
 import AssignLeaveModal from "../components/modals/AssignLeaveModal";
+import { normalizeRole, ROLES } from "../config/roles.jsx";
+import { getUserFromToken } from "../utils/auth.js";
 
 const STEPS = [
   { number: 1, label: "Basic Info" },
   { number: 2, label: "Job Details" },
   { number: 3, label: "Identity" },
-  { number: 4, label: "Previous Work" },
-  { number: 5, label: "Documents" },
-  { number: 6, label: "Review" },
+  { number: 4, label: "Review" },
 ];
 
 const INITIAL_FORM_DATA = {
@@ -34,11 +33,13 @@ const INITIAL_FORM_DATA = {
     email: "",
     phone: "",
     address: "",
+    date_of_birth: "",
   },
   jobDetails: {
     dept_id: "",
     desig_id: "",
     employee_type_id: "",
+    role: ROLES.EMPLOYEE,
     reporting_manager: "",
     join_date: "",
     offer_letter_num: "",
@@ -49,70 +50,10 @@ const INITIAL_FORM_DATA = {
     aadhar_num: "",
     passport_num: "",
   },
-  previousEmployment: [
-    {
-      company_name: "",
-      job_title: "",
-      start_date: "",
-      end_date: "",
-      experience_months: 0,
-      reason_for_leaving: "",
-    },
-  ],
-  documents: {
-    pan_card: null,
-    aadhar_card: null,
-    passport: null,
-    offer_letter: null,
-    resume: null,
-  },
-};
-
-const decodeJwtPayload = (token) => {
-  try {
-    const [, payload = ""] = token.split(".");
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
-
-    return JSON.parse(atob(padded));
-  } catch {
-    return null;
-  }
 };
 
 const getStoredUserId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("token");
-    const tokenPayload = token ? decodeJwtPayload(token) : null;
-
-    return (
-      user.id ||
-      user.userId ||
-      user.uuid ||
-      user.employeeId ||
-      user.empId ||
-      user.user_id ||
-      tokenPayload?.userId ||
-      tokenPayload?.id ||
-      tokenPayload?.sub ||
-      tokenPayload?.uid ||
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uuid") ||
-      localStorage.getItem("employeeId") ||
-      ""
-    );
-  } catch {
-    return (
-      localStorage.getItem("userId") ||
-      localStorage.getItem("uuid") ||
-      localStorage.getItem("employeeId") ||
-      ""
-    );
-  }
+  return getUserFromToken().userId || "";
 };
 
 const nullIfEmpty = (value) => {
@@ -122,17 +63,18 @@ const nullIfEmpty = (value) => {
 
 const transformPayload = (data, userId) => {
   const employeeTypeId = data.jobDetails.employee_type_id || null;
+  const normalizedRole = normalizeRole(data.jobDetails.role);
+
   return {
     firstName: data.basicInfo.first_name.trim(),
     lastName: data.basicInfo.last_name.trim(),
     email: data.basicInfo.email.trim(),
     phone: data.basicInfo.phone.trim(),
     address: data.basicInfo.address.trim(),
+    dateOfBirth: data.basicInfo.date_of_birth,
     deptId: data.jobDetails.dept_id,
     designationId: data.jobDetails.desig_id,
     employmentTypeId: employeeTypeId,
-    employeeTypeId: employeeTypeId,
-    empTypeId: employeeTypeId,
     panNum: data.identity.pan_num.trim(),
     aadharNum: data.identity.aadhar_num.trim(),
     passportNum: nullIfEmpty(data.identity.passport_num),
@@ -141,6 +83,7 @@ const transformPayload = (data, userId) => {
     noticePeriod: Number(data.jobDetails.notice_period),
     createdBy: userId,
     reportingManager: null,
+    role: normalizedRole.toUpperCase(),
   };
 };
 
@@ -161,6 +104,39 @@ const mapDesignationOption = (item = {}) => ({
   title: item.title || item.designationName || item.name || "",
 });
 
+const getMappedDesignationOptions = (payload) => {
+  const items = toArray(payload);
+
+  return items
+    .map((item) =>
+      mapDesignationOption(
+        item?.designation && typeof item.designation === "object"
+          ? item.designation
+          : item,
+      ),
+    )
+    .filter((item) => item.id && item.title);
+};
+
+const getMappedDesignationIds = (payload) => {
+  const items = toArray(payload);
+
+  return items
+    .map((item) =>
+      firstFilledValue(
+        item?.designationId,
+        item?.desigId,
+        item?.desig_id,
+        item?.id,
+        item?.designation?.id,
+        item?.designation?.designationId,
+        item?.designation?.desig_id,
+      ),
+    )
+    .filter(Boolean)
+    .map((value) => String(value).trim());
+};
+
 const mapEmployeeTypeOption = (item = {}) => ({
   id:
     item.id ||
@@ -177,6 +153,23 @@ const mapEmployeeTypeOption = (item = {}) => ({
     item.is_active_flag ??
     true,
 });
+
+const resolveOptionId = (value, options = []) => {
+  const normalizedValue = String(value || "").trim();
+  if (!normalizedValue) return "";
+
+  const matchedById = options.find(
+    (option) => String(option.id || "").trim() === normalizedValue
+  );
+  if (matchedById) return matchedById.id;
+
+  const loweredValue = normalizedValue.toLowerCase();
+  const matchedByTitle = options.find(
+    (option) => String(option.title || "").trim().toLowerCase() === loweredValue
+  );
+
+  return matchedByTitle?.id || normalizedValue;
+};
 
 const toInputDate = (value) => {
   if (!value) return "";
@@ -217,6 +210,13 @@ const mapEmployeeToFormData = (employee = {}) => {
   const department = employee.department || employee.department_details || {};
   const designation =
     employee.designation || employee.designation_details || {};
+  const employeeType =
+    employee.employeeType ||
+    employee.employee_type ||
+    employee.employmentType ||
+    employee.employment_type ||
+    employee.employeeTypeDetails ||
+    {};
 
   const mapped = {
     basicInfo: {
@@ -242,6 +242,13 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.mobile_num,
       ),
       address: firstFilledValue(employee.address, employee.current_address),
+      date_of_birth: toInputDate(
+        firstFilledValue(
+          employee.date_of_birth,
+          employee.dateOfBirth,
+          employee.dob,
+        ),
+      ),
     },
     jobDetails: {
       dept_id: firstFilledValue(
@@ -267,6 +274,14 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.employment_type_id,
         employee.empTypeId,
         employee.emp_type_id,
+        employeeType.id,
+        employeeType.employeeTypeId,
+        employeeType.employee_type_id,
+        employeeType.employmentTypeId,
+        employeeType.employment_type_id,
+      ),
+      role: normalizeRole(
+        firstFilledValue(employee.role, employee.user_role, employee.userRole),
       ),
       reporting_manager: firstFilledValue(
         employee.reporting_manager,
@@ -303,10 +318,6 @@ const mapEmployeeToFormData = (employee = {}) => {
         employee.passportNum,
       ),
     },
-    previousEmployment: Array.isArray(employee.previousEmployment)
-      ? employee.previousEmployment
-      : INITIAL_FORM_DATA.previousEmployment,
-    documents: INITIAL_FORM_DATA.documents,
   };
 
   return mapped;
@@ -319,6 +330,7 @@ export default function EmployeeOnboarding() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
   const [departments, setDepartments] = useState([]);
+  const [allDesignations, setAllDesignations] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [employeeTypes, setEmployeeTypes] = useState([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -330,6 +342,7 @@ export default function EmployeeOnboarding() {
   const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
   const [assignLeaveTypes, setAssignLeaveTypes] = useState([]);
   const [assignLeaveTypesLoading, setAssignLeaveTypesLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -360,6 +373,12 @@ export default function EmployeeOnboarding() {
             .filter((item) => item.id && item.title),
         );
 
+        setAllDesignations(
+          toArray(designationsData)
+            .map(mapDesignationOption)
+            .filter((item) => item.id && item.title),
+        );
+
         setEmployeeTypes(
           toArray(employeeTypesData)
             .map(mapEmployeeTypeOption)
@@ -376,6 +395,89 @@ export default function EmployeeOnboarding() {
   }, []);
 
   useEffect(() => {
+    const selectedDepartmentId = String(formData.jobDetails.dept_id || "").trim();
+
+    if (!selectedDepartmentId) {
+      setDesignations([]);
+      setFormData((prev) => {
+        if (!prev.jobDetails.desig_id) return prev;
+
+        return {
+          ...prev,
+          jobDetails: {
+            ...prev.jobDetails,
+            desig_id: "",
+          },
+        };
+      });
+      return;
+    }
+
+    if (!allDesignations.length) return;
+
+    let isMounted = true;
+
+    const loadMappedDesignations = async () => {
+      try {
+        const response = await getMappedDesignations(selectedDepartmentId);
+        if (!isMounted) return;
+
+        const mappedIds = new Set(getMappedDesignationIds(response));
+        const mappedOptions = getMappedDesignationOptions(response);
+        const selectedDesignationId = String(formData.jobDetails.desig_id || "").trim();
+
+        const filteredDesignations = mappedOptions.length
+          ? mappedOptions
+          : mappedIds.size > 0
+            ? allDesignations.filter((designation) =>
+                mappedIds.has(String(designation.id).trim())
+              )
+            : [];
+
+        const selectedDesignationOption = allDesignations.find(
+          (designation) => String(designation.id).trim() === selectedDesignationId
+        );
+
+        const nextDesignations =
+          selectedDesignationOption &&
+          selectedDesignationId &&
+          !filteredDesignations.some(
+            (designation) =>
+              String(designation.id).trim() === selectedDesignationId
+          )
+            ? [...filteredDesignations, selectedDesignationOption]
+            : filteredDesignations;
+
+        setDesignations(nextDesignations);
+
+        const selectedStillValid = nextDesignations.some(
+          (designation) =>
+            String(designation.id).trim() === selectedDesignationId
+        );
+
+        if (!selectedStillValid && selectedDesignationId) {
+          setFormData((prev) => ({
+            ...prev,
+            jobDetails: {
+              ...prev.jobDetails,
+              desig_id: "",
+            },
+          }));
+        }
+      } catch (error) {
+        console.error("❌ Failed to load mapped designations:", error);
+        if (isMounted) setDesignations(allDesignations);
+      }
+    };
+
+    loadMappedDesignations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [allDesignations, formData.jobDetails.dept_id, formData.jobDetails.desig_id]);
+
+  useEffect(() => {
     const routeEmployee = location.state?.employee;
 
     const hydrateEditData = async () => {
@@ -386,8 +488,12 @@ export default function EmployeeOnboarding() {
 
       try {
         if (routeEmployee) {
-          setFormData(mapEmployeeToFormData(routeEmployee));
-          return;
+          const mappedRouteEmployee = mapEmployeeToFormData(routeEmployee);
+          setFormData(mappedRouteEmployee);
+
+          if (mappedRouteEmployee.jobDetails.employee_type_id) {
+            return;
+          }
         }
 
         if (employeeId) {
@@ -408,6 +514,29 @@ export default function EmployeeOnboarding() {
     hydrateEditData();
   }, [isEditMode, employeeId, location.state]);
 
+  useEffect(() => {
+    if (!employeeTypes.length) return;
+
+    setFormData((prev) => {
+      const resolvedEmployeeTypeId = resolveOptionId(
+        prev.jobDetails.employee_type_id,
+        employeeTypes
+      );
+
+      if (resolvedEmployeeTypeId === prev.jobDetails.employee_type_id) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        jobDetails: {
+          ...prev.jobDetails,
+          employee_type_id: resolvedEmployeeTypeId,
+        },
+      };
+    });
+  }, [employeeTypes]);
+
   const handleFieldChange = (section, field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -418,53 +547,6 @@ export default function EmployeeOnboarding() {
     }));
   };
 
-  const handleArrayFieldChange = (section, index, field, value) => {
-    setFormData((prev) => {
-      const newArray = [...prev[section]];
-      newArray[index] = {
-        ...newArray[index],
-        [field]: value,
-      };
-      return {
-        ...prev,
-        [section]: newArray,
-      };
-    });
-  };
-
-  const handleAddEmployment = () => {
-    setFormData((prev) => ({
-      ...prev,
-      previousEmployment: [
-        ...prev.previousEmployment,
-        {
-          company_name: "",
-          job_title: "",
-          start_date: "",
-          end_date: "",
-          experience_months: 0,
-          reason_for_leaving: "",
-        },
-      ],
-    }));
-  };
-
-  const handleRemoveEmployment = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      previousEmployment: prev.previousEmployment.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleFileUpload = (field, file) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: {
-        ...prev.documents,
-        [field]: file,
-      },
-    }));
-  };
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     setEmployeeCredentials(null);
@@ -608,6 +690,8 @@ export default function EmployeeOnboarding() {
           errors.phone = "Invalid phone (10 digits)";
         if (!formData.basicInfo.address.trim())
           errors.address = "Address required";
+        if (!formData.basicInfo.date_of_birth)
+          errors.date_of_birth = "Date of birth required";
         break;
 
       case 2: // Job Details
@@ -617,6 +701,7 @@ export default function EmployeeOnboarding() {
           errors.desig_id = "Designation required";
         if (!formData.jobDetails.employee_type_id)
           errors.employee_type_id = "Employee type required";
+        if (!formData.jobDetails.role) errors.role = "Role required";
         if (!formData.jobDetails.join_date)
           errors.join_date = "Joining date required";
         if (!formData.jobDetails.notice_period)
@@ -635,19 +720,7 @@ export default function EmployeeOnboarding() {
           errors.aadhar_num = "Aadhaar must be 12 digits";
         break;
 
-      case 4: // Previous Employment (optional but validate if filled)
-        formData.previousEmployment.forEach((emp, idx) => {
-          if (emp.company_name && !emp.job_title)
-            errors[`job_title_${idx}`] = "Job title required";
-          if (emp.start_date && emp.end_date && emp.start_date > emp.end_date)
-            errors[`end_date_${idx}`] = "End date must be after start date";
-        });
-        break;
-
-      case 5: // Documents (optional)
-        break;
-
-      case 6: // Review (no validation needed)
+      case 4: // Review (no validation needed)
         break;
 
       default:
@@ -768,7 +841,7 @@ export default function EmployeeOnboarding() {
   };
 
   const handleCancel = () => {
-    if (
+    const hasUnsavedChanges =
       Object.values(formData).some(
         (section) =>
           (Array.isArray(section) &&
@@ -780,14 +853,14 @@ export default function EmployeeOnboarding() {
             Object.values(section).some(
               (val) => val !== "" && val !== 0 && val !== null,
             )),
-      )
-    ) {
-      if (window.confirm("Discard unsaved changes?")) {
-        navigate(-1);
-      }
-    } else {
-      navigate(-1);
+      );
+
+    if (hasUnsavedChanges) {
+      setShowCancelConfirm(true);
+      return;
     }
+
+    navigate(-1);
   };
 
   return (
@@ -879,25 +952,12 @@ export default function EmployeeOnboarding() {
           )}
 
           {step === 4 && (
-            <PreviousEmploymentStep
-              data={formData.previousEmployment}
-              errors={stepErrors}
-              onChange={handleArrayFieldChange}
-              onAdd={handleAddEmployment}
-              onRemove={handleRemoveEmployment}
+            <ReviewStep
+              formData={formData}
+              employeeTypes={employeeTypes}
+              departments={departments}
+              designations={designations}
             />
-          )}
-
-          {step === 5 && (
-            <DocumentUploadStep
-              data={formData.documents}
-              errors={stepErrors}
-              onFileUpload={handleFileUpload}
-            />
-          )}
-
-          {step === 6 && (
-            <ReviewStep formData={formData} employeeTypes={employeeTypes} />
           )}
         </div>
 
@@ -920,7 +980,7 @@ export default function EmployeeOnboarding() {
               </button>
             )}
 
-            {step < 6 ? (
+            {step < STEPS.length ? (
               <button
                 onClick={handleNext}
                 className="px-5 py-2.5 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm"
@@ -990,6 +1050,39 @@ export default function EmployeeOnboarding() {
         leaveTypes={assignLeaveTypes}
         onSubmit={handleAssignLeave}
       />
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">
+                Discard unsaved changes?
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Your onboarding form has unsaved changes. If you leave now,
+                they will be lost.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+              >
+                Continue Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
