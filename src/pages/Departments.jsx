@@ -138,7 +138,7 @@ export default function Departments() {
     setLoading(true);
     try {
       const data = await fetchDepartments();
-      console.log("✅ Departments fetched:", data);
+      // console.log("✅ Departments fetched:", data);
 
       const departmentList = Array.isArray(data)
         ? data
@@ -301,19 +301,20 @@ export default function Departments() {
     try {
       if (formMode === "add") {
         // ── 1. POST to API ─────────────────────
-        const response = await createDepartment(formData);
-        console.log("✅ Department created:", response);
+        // const response = await createDepartment(formData);
+        // console.log("✅ Department created:", response);
+        await createDepartment(formData);
         // response = "Department added successfully"
 
         // ── 2. Refresh table from GET API ──────
         await loadDepartments();
-        console.log("✅ Table refreshed");
+        // console.log("✅ Table refreshed");
       } else {
         await updateDepartment(editTarget.id, formData);
-        console.log("✅ Department updated");
+        // console.log("✅ Department updated");
 
         await loadDepartments();
-        console.log("✅ Table refreshed");
+        // console.log("✅ Table refreshed");
       }
 
       setShowForm(false);

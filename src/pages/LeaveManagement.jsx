@@ -389,8 +389,9 @@ export default function LeaveManagement() {
     setIsApplyingLeave(true);
 
     try {
-      const response = await applyLeave(formData);
-      console.log("✅ Leave apply response:", response);
+      // const response = await applyLeave(formData);
+      // console.log("✅ Leave apply response:", response);
+      await applyLeave(formData);
 
       await loadLeaveData();
       setShowApplyModal(false);
@@ -425,11 +426,11 @@ export default function LeaveManagement() {
       await approveRejectLeave(approvalTarget.id, action, remarks);
       await loadLeaveData();
 
-      console.log(`Leave ${action}ed:`, {
-        leaveId: approvalTarget.id,
-        status: action === "approve" ? "Approved" : "Rejected",
-        remarks,
-      });
+      // console.log(`Leave ${action}ed:`, {
+      //   leaveId: approvalTarget.id,
+      //   status: action === "approve" ? "Approved" : "Rejected",
+      //   remarks,
+      // });
 
       setShowApproveModal(false);
       setApprovalTarget(null);

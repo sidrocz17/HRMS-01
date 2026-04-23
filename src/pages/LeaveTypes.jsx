@@ -108,7 +108,7 @@ export default function LeaveTypes() {
     setLoading(true);
     try {
       const data = await fetchLeaveTypes();
-      console.log("✅ Leave types fetched:", data);
+      // console.log("✅ Leave types fetched:", data);
 
       // Map API fields → local fields
       const mapped = data.map(mapLeaveType);
@@ -166,8 +166,9 @@ export default function LeaveTypes() {
 
     try {
       if (formMode === "add") {
-        const response = await createLeaveType(formData);
-        console.log("✅ Leave type created:", response);
+        // const response = await createLeaveType(formData);
+        // console.log("✅ Leave type created:", response);
+        await createLeaveType(formData)
         await loadLeaveTypes();
       } else {
         // Edit — local update until PUT API ready

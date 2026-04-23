@@ -63,7 +63,7 @@ export const mapDesignationsToDepartment = async (deptId, desigIds) => {
     userId,
   };
 
-  console.log("📤 POST /api/dept-desig:", body);
+  // console.log("📤 POST /api/dept-desig:", body);
 
   const response = await axios.post(
     buildApiUrl("/dept-desig"),
@@ -71,7 +71,7 @@ export const mapDesignationsToDepartment = async (deptId, desigIds) => {
     authHeaders()
   );
 
-  console.log("📥 dept-desig response:", response.data);
+  // console.log("📥 dept-desig response:", response.data);
   return response.data;
 };
 

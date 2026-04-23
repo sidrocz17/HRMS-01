@@ -21,7 +21,7 @@ export const createDepartment = async (formData) => {
   console.log("📤 Sending to API:", body);
 
   const response = await axios.post(
-    buildApiUrl("/department"),
+    buildApiUrl("/departments"),
     body,
     authHeaders()
   );
