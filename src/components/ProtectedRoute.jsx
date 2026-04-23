@@ -9,19 +9,31 @@
 //  <ProtectedRoute allowedRoles={["admin"]}> ← only admin
 // ─────────────────────────────────────────────
 
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { ROLE_REDIRECT } from "../config/roles.jsx";
 import { getUserFromToken } from "../utils/auth.js";
+import { shouldForcePasswordReset } from "../utils/authStorage";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
+  const location = useLocation();
   const { token, role } = getUserFromToken();
+  const forcePasswordReset = shouldForcePasswordReset();
 
   // ── 1. Not logged in → go to login ──────────
   if (!token) {
     return <Navigate to="/" replace />;
   }
 
-  // ── 2. Role restriction check ───────────────
+  // ── 2. Force password reset until completed ─
+  if (forcePasswordReset && location.pathname !== "/reset-password") {
+    return <Navigate to="/reset-password" replace />;
+  }
+
+  if (!forcePasswordReset && location.pathname === "/reset-password") {
+    return <Navigate to={ROLE_REDIRECT[role] || "/dashboard"} replace />;
+  }
+
+  // ── 3. Role restriction check ───────────────
   //  If allowedRoles is provided, verify the user's
   //  role is in that list. If not → send to dashboard
   //  (they're logged in but not authorized for this page)
@@ -29,7 +41,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to={ROLE_REDIRECT[role] || "/dashboard"} replace />;
   }
 
-  // ── 3. All checks passed → render the page ──
+  // ── 4. All checks passed → render the page ──
   return children;
 };
 

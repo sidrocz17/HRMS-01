@@ -139,7 +139,7 @@ export default function LeaveTable({ data, onCancel }) {
                       {String(leave.status || "").trim().toLowerCase() === "pending" && (
                         <Tooltip text="Cancel">
                           <button
-                            onClick={() => onCancel(leave.id)}
+                            onClick={() => onCancel(leave)}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

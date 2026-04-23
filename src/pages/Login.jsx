@@ -4,9 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
 import { buildUrl } from "../api/apiBase";
 import { getUserFromToken } from "../utils/auth.js";
-import { setForcePasswordReset } from "../utils/authStorage";
-
-const DEFAULT_PASSWORD = "Emp@123456";
+import {
+  setForcePasswordReset,
+  setSessionTokens,
+  shouldForcePasswordReset,
+} from "../utils/authStorage";
 
 const NetworkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -59,6 +61,11 @@ export default function XcelTechSplitLogin() {
   useEffect(() => {
     const { token, role } = getUserFromToken();
     if (token && role) {
+      if (shouldForcePasswordReset()) {
+        navigate("/reset-password", { replace: true });
+        return;
+      }
+
       navigate(ROLE_REDIRECT[role] || "/dashboard", { replace: true });
     }
   }, [navigate]);
@@ -92,17 +99,23 @@ export default function XcelTechSplitLogin() {
       if (!token) {
         throw new Error("Token missing in login response");
       }
-      localStorage.setItem("token", token);
+      setSessionTokens({
+        accessToken: token,
+        refreshToken: data.refreshToken || "",
+      });
       localStorage.removeItem("auth_token");
 
       const tokenUser = getUserFromToken();
       const userRole = normalizeRole(
         tokenUser.role || data.role || data.user?.role || "admin"
       );
+      const mustResetPassword = Boolean(data.firstLogin);
 
-      setForcePasswordReset(password === DEFAULT_PASSWORD);
+      setForcePasswordReset(mustResetPassword);
 
-      const redirectPath = ROLE_REDIRECT[userRole] || "/dashboard";
+      const redirectPath = mustResetPassword
+        ? "/reset-password"
+        : ROLE_REDIRECT[userRole] || "/dashboard";
       navigate(redirectPath, { replace: true });
 
     } catch (error) {

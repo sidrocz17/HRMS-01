@@ -148,10 +148,16 @@ export const rejectLeave = async (id, remarks = "") => {
   return response.data;
 };
 
-// ── DELETE /leaves/:id — Cancel leave request ─
-export const cancelLeave = async (id) => {
-  const response = await axios.delete(
-    buildApiUrl(`/leaves/${id}`),
+// ── POST /leaves/cancel — Cancel leave request ─
+export const cancelLeave = async (leaveApplicationId, remarks = "") => {
+  const body = {
+    leaveApplicationId,
+    remarks,
+  };
+
+  const response = await axios.post(
+    buildApiUrl("/leaves/cancel"),
+    body,
     authHeaders()
   );
 

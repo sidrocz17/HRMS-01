@@ -441,6 +441,7 @@ export default function Dashboard() {
       }
 
       await reloadEmployeeAttendance();
+      window.location.reload();
     } catch (error) {
       console.error("❌ Dashboard attendance action failed:", error);
       setAttendanceActionError(

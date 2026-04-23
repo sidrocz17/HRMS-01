@@ -4,10 +4,6 @@ import { getLoggedInEmpId, getProfile } from "../api/profileApi";
 import { logoutUser } from "../api/authApi";
 import { getUserFromToken } from "../utils/auth";
 import { ROLE_META, ROLES } from "../config/roles.jsx";
-import {
-  shouldForcePasswordReset,
-} from "../utils/authStorage";
-import ResetPasswordForm from "./auth/ResetPasswordForm";
 
 const getInitials = (firstName, lastName, fallback = "") => {
   const first = String(firstName || "").trim().charAt(0);
@@ -28,8 +24,6 @@ const getInitials = (firstName, lastName, fallback = "") => {
 export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [mustResetPassword, setMustResetPassword] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [profile, setProfile] = useState(null);
   const menuRef = useRef(null);
@@ -62,12 +56,6 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
   }, []);
 
   useEffect(() => {
-    const forceReset = shouldForcePasswordReset();
-    setMustResetPassword(forceReset);
-    setShowResetModal(forceReset);
-  }, []);
-
-  useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
@@ -77,9 +65,6 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
     const handleEscape = (event) => {
       if (event.key === "Escape") {
         setMenuOpen(false);
-        if (!mustResetPassword) {
-          setShowResetModal(false);
-        }
       }
     };
 
@@ -90,7 +75,7 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [mustResetPassword]);
+  }, []);
 
   const firstName =
     profile?.firstName ||
@@ -138,12 +123,6 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
   const openResetModal = () => {
     setMenuOpen(false);
     navigate("/reset-password");
-  };
-
-  const closeResetModal = () => {
-    if (mustResetPassword) return;
-
-    setShowResetModal(false);
   };
 
   return (
@@ -269,30 +248,6 @@ export default function Navbar({ onMenuToggle, isSidebarOpen = true }) {
           )}
         </div>
       </header>
-
-      {showResetModal && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Reset Password</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {mustResetPassword
-                  ? "You signed in with the default password. Please set a new password to continue."
-                  : "Enter your current password and choose a new one."}
-              </p>
-            </div>
-
-            <ResetPasswordForm
-              mustResetPassword={mustResetPassword}
-              onSuccess={() => {
-                setMustResetPassword(false);
-                setShowResetModal(false);
-              }}
-              onCancel={closeResetModal}
-            />
-          </div>
-        </div>
-      )}
     </>
   );
 }

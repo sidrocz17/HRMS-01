@@ -186,7 +186,9 @@ function ViewModal({ record, requestType = "resignation", onClose }) {
             { label: "Final Last Day",        value: formatDate(record.finalLastWorkingDate) || "Not set" },
             { label: "Status",               value: record.status },
             { label: "Reason",               value: record.reason },
-            { label: "Feedback",             value: record.feedback || "—" },
+            ...(!isTermination
+              ? [{ label: "Feedback", value: record.feedback || "—" }]
+              : []),
             { label: "Eligible for Rehire",  value: record.isGoodToRehire === false ? "No" : record.isGoodToRehire ? "Yes" : "—" },
           ].map(({ label, value }) => (
             <div key={label} className="flex justify-between items-start gap-4">

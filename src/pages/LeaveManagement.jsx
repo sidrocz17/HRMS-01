@@ -12,10 +12,12 @@ import LeaveTable from "../components/leave/LeaveTable";
 import TeamLeaveTable from "../components/leave/TeamLeaveTable";
 import ApplyLeaveModal from "../components/leave/ApplyLeaveModal";
 import ApproveLeaveModal from "../components/leave/ApproveLeaveModal";
+import CancelLeaveModal from "../components/leave/CancelLeaveModal";
 import LeaveDetailsModal from "../components/leave/LeaveDetailsModal";
 import PostYearlyLeavesModal from "../components/modals/PostYearlyLeavesModal";
 import {
   applyLeave,
+  cancelLeave,
   fetchLeaveBalance,
   fetchLeaveDetails,
   fetchLeaveHistory,
@@ -228,12 +230,16 @@ export default function LeaveManagement() {
   const [isApplyingLeave, setIsApplyingLeave] = useState(false);
   const [showYearlyLeavesModal, setShowYearlyLeavesModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [showLeaveDetailsModal, setShowLeaveDetailsModal] = useState(false);
   const [approvalTarget, setApprovalTarget] = useState(null);
   const [approvalAction, setApprovalAction] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
   const [leaveDetails, setLeaveDetails] = useState(null);
   const [leaveDetailsLoading, setLeaveDetailsLoading] = useState(false);
   const [leaveDetailsError, setLeaveDetailsError] = useState("");
+  const [cancelLeaveError, setCancelLeaveError] = useState("");
+  const [isCancellingLeave, setIsCancellingLeave] = useState(false);
   const [apiError, setApiError] = useState("");
 
   const canViewTeamLeaves = role === ROLES.HR;
@@ -437,8 +443,36 @@ export default function LeaveManagement() {
   };
 
   // ── Cancel Leave ──────────────────────────────
-  const handleCancelLeave = (leaveId) => {
-    setMyLeaves((prev) => prev.filter((l) => l.id !== leaveId));
+  const handleCancelLeaveClick = (leave) => {
+    setCancelTarget(leave);
+    setCancelLeaveError("");
+    setShowCancelModal(true);
+  };
+
+  const handleCancelLeaveSubmit = async (remarks) => {
+    if (!cancelTarget?.id) return;
+
+    try {
+      setIsCancellingLeave(true);
+      setCancelLeaveError("");
+      setApiError("");
+
+      await cancelLeave(cancelTarget.id, remarks);
+      await loadLeaveData();
+
+      setShowCancelModal(false);
+      setCancelTarget(null);
+    } catch (error) {
+      console.error("❌ Cancel leave failed:", error);
+      setCancelLeaveError(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          error?.message ||
+          "Failed to cancel leave"
+      );
+    } finally {
+      setIsCancellingLeave(false);
+    }
   };
 
   const handleViewLeave = async (leave) => {
@@ -581,7 +615,7 @@ export default function LeaveManagement() {
 
       {/* ── My Leaves Table ── */}
       {activeTab === "my-leaves" && (
-        <LeaveTable data={myLeaves} onCancel={handleCancelLeave} />
+        <LeaveTable data={myLeaves} onCancel={handleCancelLeaveClick} />
       )}
 
       {/* ── Team Leaves Table ── */}
@@ -630,6 +664,21 @@ export default function LeaveManagement() {
             setShowApproveModal(false);
             setApprovalTarget(null);
             setApprovalAction(null);
+          }}
+        />
+      )}
+
+      {showCancelModal && cancelTarget && (
+        <CancelLeaveModal
+          leave={cancelTarget}
+          submitting={isCancellingLeave}
+          apiError={cancelLeaveError}
+          onConfirm={handleCancelLeaveSubmit}
+          onClose={() => {
+            if (isCancellingLeave) return;
+            setShowCancelModal(false);
+            setCancelTarget(null);
+            setCancelLeaveError("");
           }}
         />
       )}

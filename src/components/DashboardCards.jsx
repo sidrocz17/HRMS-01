@@ -171,6 +171,7 @@ export default function DashboardCards() {
       }
 
       await loadTodayAttendance();
+      window.location.reload();
     } catch (error) {
       console.error("❌ Dashboard quick-action attendance failed:", error);
       setAttendanceError(
