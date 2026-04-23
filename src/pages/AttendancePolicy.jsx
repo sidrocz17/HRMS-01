@@ -475,8 +475,6 @@ export default function AttendancePolicy() {
         .filter(Boolean);
       const mergedHistory = liveRows.length > 0 ? liveRows : normalizedHistory;
 
-      console.log("✅ Policy:", policyData);
-      console.log("✅ History:", historyData);
       setPolicy(currentPolicy);
       setHistory(mergedHistory);
     } catch (err) {
@@ -503,7 +501,6 @@ export default function AttendancePolicy() {
         await createAttendancePolicy(formData);
       }
       await loadAll();
-      console.log(editTarget ? "✅ Policy updated" : "✅ Policy created");
       setShowForm(false);
       setEditTarget(null);
     } catch (err) {
@@ -661,7 +658,7 @@ export default function AttendancePolicy() {
             )}
 
             {/* Last updated info */}
-            {policy?.updatedBy && (
+            {/* {policy?.updatedBy && (
               <div className="mt-8 pt-6 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-400">
                 <UserIcon />
                 <span>
@@ -673,7 +670,7 @@ export default function AttendancePolicy() {
                   )}
                 </span>
               </div>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -704,7 +701,6 @@ export default function AttendancePolicy() {
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/60">
                     <TH icon={<CalIcon />}  label="Date" />
-                    <TH icon={<UserIcon />} label="Updated By" />
                     <TH icon={<ClockIcon />} label="Min In Time" />
                     <TH icon={<ClockIcon />} label="Min Out Time" />
                     <TH icon={<CalIcon />}  label="Working Hours" />
@@ -717,7 +713,7 @@ export default function AttendancePolicy() {
                 <tbody className="divide-y divide-gray-50">
                   {history.length === 0 ? (
                     <tr>
-                      <td colSpan={isAdmin ? 7 : 6} className="px-6 py-16 text-center">
+                      <td colSpan={isAdmin ? 6 : 5} className="px-6 py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <svg className="w-10 h-10 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -750,18 +746,6 @@ export default function AttendancePolicy() {
                                 Latest
                               </span>
                             )}
-                          </td>
-
-                          {/* Updated By */}
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-[#1a2240]/10 flex items-center justify-center flex-shrink-0">
-                                <span className="text-xs font-bold text-[#1a2240]">
-                                  {row.updatedBy?.charAt(0) || "?"}
-                                </span>
-                              </div>
-                              <span className="text-sm text-gray-700">{row.updatedBy || "—"}</span>
-                            </div>
                           </td>
 
                           {/* Min In Time */}

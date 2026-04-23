@@ -93,7 +93,7 @@ export default function XcelTechSplitLogin() {
       );
 
       const data = response.data;
-      console.log("Login response:", data);
+      // console.log("Login response:", data);
 
       const token = data.accessToken || data.token;
       if (!token) {

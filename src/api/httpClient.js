@@ -6,11 +6,11 @@ import {
   setSessionTokens,
 } from "../utils/authStorage";
 import { isTokenExpired, logoutAndRedirect } from "../utils/auth";
-import { BASE_URL, buildUrl } from "./apiBase";
+import { BASE_URL } from "./apiBase";
 
-const REFRESH_PATH = buildUrl(
-  import.meta.env.VITE_AUTH_REFRESH_PATH || "/auth/refresh"
-);
+const REFRESH_PATH =
+  String(import.meta.env.VITE_AUTH_REFRESH_URL || "").trim() ||
+  "http://172.16.219.107:8080/auth/refresh";
 
 const httpClient = axios.create({
   baseURL: BASE_URL || undefined,
@@ -78,6 +78,13 @@ const refreshAccessToken = async () => {
 
 const attachAuthHeader = (config = {}) => {
   const token = getAccessToken();
+  const refreshToken = getRefreshToken();
+
+  // Let response interceptor or preflight refresh handle expired access tokens.
+  // Do not clear the session here if a refresh token is available.
+  if (token && isTokenExpired(token) && refreshToken) {
+    return config;
+  }
 
   if (token && isTokenExpired(token)) {
     clearSession();
@@ -91,6 +98,26 @@ const attachAuthHeader = (config = {}) => {
   }
 
   return config;
+};
+
+const attachValidAuthHeader = async (config = {}) => {
+  const token = getAccessToken();
+  const refreshToken = getRefreshToken();
+
+  if (token && isTokenExpired(token) && refreshToken && !isAuthRoute(config.url)) {
+    try {
+      const nextAccessToken = await refreshAccessToken();
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${nextAccessToken}`;
+      return config;
+    } catch (error) {
+      clearSession();
+      logoutAndRedirect();
+      return Promise.reject(error);
+    }
+  }
+
+  return attachAuthHeader(config);
 };
 
 const handleAuthError = async (error, client) => {
@@ -139,7 +166,7 @@ export const setupAuthInterceptors = () => {
   if (interceptorsInitialized) return;
 
   [axios, httpClient].forEach((client) => {
-    client.interceptors.request.use(attachAuthHeader);
+    client.interceptors.request.use(attachValidAuthHeader);
     client.interceptors.response.use(
       (response) => response,
       (error) => handleAuthError(error, client)

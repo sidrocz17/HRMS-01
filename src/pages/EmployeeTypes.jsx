@@ -7,7 +7,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import EmployeeTypeForm from "../components/employeetype/EmployeeTypeForm";
-import DeleteConfirm    from "../components/employeetype/DeleteConfirm";
 import {
   createEmployeeType,
   deactivateEmployeeType,
@@ -68,7 +67,6 @@ export default function EmployeeTypes() {
   const [showForm, setShowForm]         = useState(false);
   const [formMode, setFormMode]         = useState("add");
   const [editTarget, setEditTarget]     = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── API state ─────────────────────────────────
   const [loading, setLoading]       = useState(false);
@@ -218,35 +216,6 @@ export default function EmployeeTypes() {
         error.response?.data?.error ||
         `Error ${error.response?.status || ""}: Failed to deactivate employee type.`;
       setApiError(message);
-    }
-  };
-
-  // ── Delete ────────────────────────────────────
-  const handleDeleteClick = (item) => {
-    setApiError("");
-    setDeleteTarget(item);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-
-    setDeleteSubmitting(true);
-    setApiError("");
-
-    try {
-      await deleteEmployeeType(deleteTarget.id);
-      setEmployeeTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
-      setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
-      setDeleteTarget(null);
-    } catch (error) {
-      console.error("❌ Failed to delete employee type:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        `Error ${error.response?.status || ""}: Failed to delete employee type.`;
-      setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
@@ -577,20 +546,6 @@ export default function EmployeeTypes() {
                             </svg>
                           </button>
                         </Tooltip>
-
-                        {/* Delete */}
-                        <Tooltip text="Delete">
-                          <button
-                            onClick={() => handleDeleteClick(item)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </Tooltip>
-
                       </div>
                     </td>
 
@@ -664,21 +619,6 @@ export default function EmployeeTypes() {
           onClose={() => {
             if (!submitting) {
               setShowForm(false);
-              setApiError("");
-            }
-          }}
-        />
-      )}
-
-      {deleteTarget && (
-        <DeleteConfirm
-          itemName={deleteTarget.name}
-          submitting={deleteSubmitting}
-          error={apiError}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => {
-            if (!deleteSubmitting) {
-              setDeleteTarget(null);
               setApiError("");
             }
           }}
