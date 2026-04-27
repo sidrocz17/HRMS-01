@@ -1,5 +1,6 @@
 // src/components/employee/onboarding/ReviewStep.jsx
 import { ROLES } from "../../../config/roles.jsx";
+import { formatLocalTime } from "../../../utils/dateUtils.js";
 
 export default function ReviewStep({
   formData,
@@ -26,11 +27,7 @@ export default function ReviewStep({
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatLocalTime(dateStr).split(", ")[0] || "-";
   };
 
   const Section = ({ title, children }) => (

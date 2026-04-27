@@ -15,6 +15,8 @@ import {
   updateEmployeeType,
 } from "../api/employeeTypeApi";
 import { getRoleFromToken } from "../utils/auth.js";
+import { formatLocalTime } from "../utils/dateUtils.js";
+import { extractApiErrorMessage } from "../utils/error";
 
 const PAGE_SIZE = 8;
 
@@ -46,9 +48,7 @@ const Tooltip = ({ text, children }) => (
 // ── Format date ───────────────────────────────
 const formatDate = (iso) => {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  return formatLocalTime(iso).split(", ")[0] || "—";
 };
 
 export default function EmployeeTypes() {
@@ -59,7 +59,7 @@ export default function EmployeeTypes() {
   // Each item shape: { id, name, isActive, createdOn }
   const [employeeTypes, setEmployeeTypes] = useState([]);
   const [search, setSearch]               = useState("");
-  const [statusFilter, setStatusFilter]   = useState("all");
+  const [statusFilter, setStatusFilter]   = useState("active");
   const [selectedIds, setSelectedIds]     = useState([]);
   const [currentPage, setCurrentPage]     = useState(1);
 
@@ -83,7 +83,6 @@ export default function EmployeeTypes() {
     setLoading(true);
     try {
       const data = await fetchEmployeeTypes();
-      console.log("✅ Raw GET response:", data);
 
       // ── Map exactly to GET response fields ────
       // GET returns: { id, name, isActive, createdOn, createdBy, updatedOn, updatedBy }
@@ -94,7 +93,6 @@ export default function EmployeeTypes() {
         createdOn: d.createdOn,
       }));
 
-      console.log("✅ Mapped:", mapped);
       setEmployeeTypes(mapped);
     } catch (error) {
       console.error("❌ Failed to fetch:", error);
@@ -156,29 +154,10 @@ export default function EmployeeTypes() {
         // formData = { name, isActive }
         // API also needs createdBy/updatedBy — handled inside employeeTypeApi.js
         await createEmployeeType(formData);
-        console.log("✅ Employee type created");
         await loadEmployeeTypes(); // refresh from GET
       } else {
-        const response = await updateEmployeeType(editTarget.id, formData);
-        const updatedEmployeeType = response?.data || response;
-
-        setEmployeeTypes((prev) =>
-          prev.map((d) =>
-            d.id === editTarget.id
-              ? {
-                  ...d,
-                  name:
-                    updatedEmployeeType?.name ||
-                    updatedEmployeeType?.typeName ||
-                    formData.name,
-                  isActive:
-                    updatedEmployeeType?.isActive ??
-                    updatedEmployeeType?.is_active ??
-                    formData.isActive,
-                }
-              : d
-          )
-        );
+        await updateEmployeeType(editTarget.id, formData);
+        await loadEmployeeTypes();
       }
 
       setShowForm(false);
@@ -186,10 +165,7 @@ export default function EmployeeTypes() {
 
     } catch (error) {
       console.error("❌ API Error:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error   ||
-        `Error ${error.response?.status || ""}: Something went wrong.`;
+      const message = extractApiErrorMessage(error, "Something went wrong.");
       setApiError(message);
     } finally {
       setSubmitting(false);
@@ -204,17 +180,13 @@ export default function EmployeeTypes() {
 
     try {
       await deactivateEmployeeType(item.id);
-      setEmployeeTypes((prev) =>
-        prev.map((d) =>
-          d.id === item.id ? { ...d, isActive: false } : d
-        )
-      );
+      await loadEmployeeTypes();
     } catch (error) {
       console.error("❌ Failed to deactivate employee type:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        `Error ${error.response?.status || ""}: Failed to deactivate employee type.`;
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to deactivate employee type.",
+      );
       setApiError(message);
     }
   };
@@ -227,14 +199,14 @@ export default function EmployeeTypes() {
 
     try {
       await Promise.all(selectedIds.map((id) => deleteEmployeeType(id)));
-      setEmployeeTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      await loadEmployeeTypes();
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Failed to delete selected employee types:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        `Error ${error.response?.status || ""}: Failed to delete selected employee types.`;
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to delete selected employee types.",
+      );
       setApiError(message);
     } finally {
       setDeleteSubmitting(false);
@@ -326,7 +298,6 @@ export default function EmployeeTypes() {
             )}
           </div>
 
-          {/* Status filter pills */}
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
             {[
               { value: "all",      label: "All",      count: employeeTypes.length },

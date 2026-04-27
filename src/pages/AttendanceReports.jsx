@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo } from "react";
 import FiltersBar  from "../components/reports/FiltersBar";
 import ReportsTable, { StatusBadge } from "../components/reports/ReportsTable";
+import { extractApiErrorMessage } from "../utils/error";
 
 // ── Import your existing API function ──────────
 import { getAllAttendance } from "../api/attendanceApi";
@@ -110,7 +111,7 @@ export default function AttendanceReports() {
       } catch (err) {
         console.error("❌ Attendance report load failed:", err);
         setAttendanceData([]);
-        setApiError(err?.response?.data?.message || err?.message || "Failed to load attendance data.");
+        setApiError(extractApiErrorMessage(err, "Failed to load attendance data."));
       } finally {
         setLoading(false);
       }

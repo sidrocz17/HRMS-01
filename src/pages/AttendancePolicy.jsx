@@ -19,6 +19,7 @@ import {
 } from "../api/attendancePolicyApi";
 import { fetchUsers } from "../api/userApi";
 import { getEmployees } from "../api/employeeManagementApi";
+import { formatLocalTime } from "../utils/dateUtils.js";
 
 const Tooltip = ({ text, children }) => (
   <div className="relative group">
@@ -69,11 +70,7 @@ const formatDate = (dateStr) => {
   const normalized = typeof dateStr === "string" && dateStr.includes("T")
     ? dateStr
     : `${dateStr}T00:00:00`;
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  return formatLocalTime(normalized).split(", ")[0] || "—";
 };
 
 const firstFilled = (...values) =>
@@ -658,7 +655,7 @@ export default function AttendancePolicy() {
             )}
 
             {/* Last updated info */}
-            {/* {policy?.updatedBy && (
+            {policy?.updatedBy && (
               <div className="mt-8 pt-6 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-400">
                 <UserIcon />
                 <span>
@@ -670,7 +667,7 @@ export default function AttendancePolicy() {
                   )}
                 </span>
               </div>
-            )} */}
+            )}
           </div>
         </div>
 

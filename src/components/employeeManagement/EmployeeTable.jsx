@@ -1,4 +1,5 @@
 import ActionButtons from "../employee/ActionButtons";
+import { formatLocalTime } from "../../utils/dateUtils.js";
 
 // src/components/employee/EmployeeTable.jsx
 export default function EmployeeTable({
@@ -11,11 +12,7 @@ export default function EmployeeTable({
 }) {
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatLocalTime(dateStr).split(", ")[0] || "-";
   };
 
   return (

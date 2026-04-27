@@ -184,30 +184,6 @@ export default function ApprovalModal({
             <ErrMsg field="feedback" />
           </div>
 
-          {/* Eligible for Rehire toggle */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-sm font-medium text-gray-700">Eligible for Rehire</p>
-              <p className="text-xs text-gray-400">
-                {form.isGoodToRehire
-                  ? "Employee is eligible for future rehire"
-                  : "Employee is not eligible for rehire"}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleChange("isGoodToRehire", !form.isGoodToRehire)}
-              disabled={submitting}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-60 ${
-                form.isGoodToRehire ? "bg-emerald-500" : "bg-gray-200"
-              }`}
-            >
-              <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${
-                form.isGoodToRehire ? "translate-x-6" : "translate-x-1"
-              }`} />
-            </button>
-          </div>
-
         </div>
 
         {/* ── API Error ── */}

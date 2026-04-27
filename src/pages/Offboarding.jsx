@@ -989,11 +989,6 @@ export default function Offboarding() {
                     </div>
                   )}
                 </div>
-                {terminationForm.empId && (
-                  <p className="mt-2 text-xs text-emerald-700">
-                    Selected employee ID: {terminationForm.empId}
-                  </p>
-                )}
                 <TerminationErrMsg field="empId" />
               </div>
 

@@ -36,6 +36,12 @@ export const fetchLeavePolicies = async () => {
   return response.data;
 };
 
+// ── GET /leave-policy/:id ─────────────────────
+export const fetchLeavePolicyById = async (id) => {
+  const response = await httpClient.get(`${BASE_URL}/api/leave-policy/${id}`);
+  return response.data;
+};
+
 // ── GET /leaveTypes ───────────────────────────
 export const fetchLeaveTypes = async () => {
   const response = await httpClient.get(`${BASE_URL}/api/leaveTypes`);

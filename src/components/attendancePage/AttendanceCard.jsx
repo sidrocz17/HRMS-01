@@ -1,6 +1,7 @@
 // src/components/attendance/AttendanceCard.jsx
 
 import { useEffect, useState } from "react";
+import { formatLocalTime } from "../../utils/dateUtils.js";
 
 // ── Status config ─────────────────────────────
 const STATUS_CONFIG = {
@@ -24,12 +25,7 @@ const STATUS_CONFIG = {
 // ── Helpers ───────────────────────────────────
 function formatTime(isoString) {
   if (!isoString) return "—";
-  const d = new Date(isoString);
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? "PM" : "AM";
-  const hh = h % 12 || 12;
-  return `${String(hh).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+  return formatLocalTime(isoString).split(", ")[1] || "—";
 }
 
 function calcElapsed(inISO) {

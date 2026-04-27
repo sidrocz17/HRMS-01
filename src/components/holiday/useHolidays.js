@@ -12,6 +12,7 @@ import {
   deleteHoliday,
   normalizeHolidayType,
 } from "../../api/holidayApi";
+import { extractApiErrorMessage } from "../../utils/error";
 
 export function useHolidays(initialYear) {
   const [holidays, setHolidays]         = useState([]);
@@ -68,10 +69,10 @@ export function useHolidays(initialYear) {
       return true;
     } catch (err) {
       console.error("❌ Create error:", err);
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.error   ||
-        "Failed to add holiday. Please try again.";
+      const msg = extractApiErrorMessage(
+        err,
+        "Failed to add holiday. Please try again.",
+      );
       setApiError(msg);
       return false;
     } finally {
@@ -90,10 +91,10 @@ export function useHolidays(initialYear) {
       return true;
     } catch (err) {
       console.error("❌ Update error:", err);
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.error   ||
-        "Failed to update holiday. Please try again.";
+      const msg = extractApiErrorMessage(
+        err,
+        "Failed to update holiday. Please try again.",
+      );
       setApiError(msg);
       return false;
     } finally {
@@ -112,10 +113,10 @@ export function useHolidays(initialYear) {
       return true;
     } catch (err) {
       console.error("❌ Delete error:", err);
-      const msg =
-        err.response?.data?.message ||
-        err.response?.data?.error   ||
-        "Failed to delete holiday. Please try again.";
+      const msg = extractApiErrorMessage(
+        err,
+        "Failed to delete holiday. Please try again.",
+      );
       setApiError(msg);
       return false;
     } finally {

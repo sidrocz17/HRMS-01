@@ -28,7 +28,7 @@ export default function LeavePolicyForm({
   initial = null,
   leaveTypes = [],
   employeeTypes = [],
-  existingKeys = [],   // ["typeId_empTypeId_FY"] for duplicate check
+  existingKeys = [],   // ["typeId_empTypeId"] for duplicate check
   submitting = false,
   apiError = "",
   onSubmit,
@@ -41,10 +41,10 @@ export default function LeavePolicyForm({
   useEffect(() => {
     if (isEdit && initial) {
       setForm({
-        type_id:          initial.type_id,
-        employee_type_id: initial.employee_type_id,
-        financial_year:   initial.financial_year,
-        no_of_days:       initial.no_of_days,
+        type_id:          String(initial.type_id ?? ""),
+        employee_type_id: String(initial.employee_type_id ?? ""),
+        financial_year:   String(initial.financial_year ?? ""),
+        no_of_days:       String(initial.no_of_days ?? ""),
       });
     }
   }, [isEdit, initial]);
@@ -68,16 +68,16 @@ export default function LeavePolicyForm({
     }
 
     // Duplicate check
-    const key = `${form.type_id}_${form.employee_type_id}_${form.financial_year}`;
+    const key = `${form.type_id}_${form.employee_type_id}`;
     const isDuplicate = existingKeys
       .filter((k) => isEdit
-        ? k !== `${initial?.type_id}_${initial?.employee_type_id}_${initial?.financial_year}`
+        ? k !== `${initial?.type_id}_${initial?.employee_type_id}`
         : true
       )
       .includes(key);
 
     if (isDuplicate) {
-      newErrors.financial_year = "A policy for this Leave Type + Employee Type + Calendar Year already exists.";
+      newErrors.employee_type_id = "A policy for this Leave Type and Employee Type already exists.";
     }
 
     setErrors(newErrors);
@@ -164,7 +164,7 @@ export default function LeavePolicyForm({
             >
               <option value="">Select leave type...</option>
               {leaveTypes.map((lt) => (
-                <option key={lt.id} value={lt.id}>
+                <option key={lt.id} value={String(lt.id)}>
                   {lt.label || lt.name || lt.title || lt.type || lt.typeName || lt.leaveType}
                 </option>
               ))}
@@ -185,7 +185,7 @@ export default function LeavePolicyForm({
             >
               <option value="">Select employee type...</option>
               {employeeTypes.map((et) => (
-                <option key={et.id} value={et.id}>
+                <option key={et.id} value={String(et.id)}>
                   {et.label || et.name || et.title || et.type || et.typeName || et.employeeType || et.employee_type}
                 </option>
               ))}

@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import DashboardCards from "../components/DashboardCards";
-import { getAllAttendance, getAttendance } from "../api/attendanceApi";
 import { getLoggedInEmpId, getProfile } from "../api/profileApi";
 import {
   getTodayBirthdays,
   getTodayWorkAnniversaries,
   getUpcomingHolidays,
 } from "../api/dashboardApi";
-import { ROLES } from "../config/roles.jsx";
 import { getUserFromToken } from "../utils/auth.js";
+import AttendanceChartCard from "../components/dashboard/AttendanceChartCard";
 
 const HOLIDAY_STYLES = [
   "bg-pink-100 border-pink-300 text-pink-700",
@@ -16,48 +15,7 @@ const HOLIDAY_STYLES = [
   "bg-green-100 border-green-300 text-green-700",
 ];
 
-const ATTENDANCE_STATUS_META = {
-  PRESENT: {
-    label: "Present",
-    badgeClass: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    dotClass: "bg-emerald-400",
-  },
-  LATE: {
-    label: "Late",
-    badgeClass: "bg-amber-50 text-amber-700 ring-amber-200",
-    dotClass: "bg-amber-400",
-  },
-  ABSENT: {
-    label: "Absent",
-    badgeClass: "bg-rose-50 text-rose-700 ring-rose-200",
-    dotClass: "bg-rose-400",
-  },
-};
-
-const pad = (value) => String(value).padStart(2, "0");
 const DASHBOARD_REFRESH_INTERVAL_MS = 30000;
-
-const getTodayDate = () => {
-  const today = new Date();
-  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-};
-
-const deriveAttendanceStatus = (record = {}) => {
-  const apiStatus = String(record.status || "").trim().toUpperCase();
-  if (apiStatus) return apiStatus;
-
-  if (!record.inTime || record.inTime === "—") return "ABSENT";
-
-  const [timePart, meridiem] = String(record.inTime).trim().split(" ");
-  if (!timePart || !meridiem) return "PRESENT";
-
-  let [hours, minutes] = timePart.split(":").map(Number);
-  if (meridiem === "PM" && hours !== 12) hours += 12;
-  if (meridiem === "AM" && hours === 12) hours = 0;
-
-  const inAs24 = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  return inAs24 > "09:30" ? "LATE" : "PRESENT";
-};
 
 const getDashboardFirstName = () => {
   const user = getUserFromToken();
@@ -79,8 +37,6 @@ const getDashboardFirstName = () => {
 
 export default function Dashboard() {
   const [upcomingHolidays, setUpcomingHolidays] = useState([]);
-  const [todayAttendance, setTodayAttendance] = useState([]);
-  const [attendanceLoading, setAttendanceLoading] = useState(true);
   const [workAnniversaries, setWorkAnniversaries] = useState([]);
   const [anniversariesLoading, setAnniversariesLoading] = useState(true);
   const [birthdays, setBirthdays] = useState([]);
@@ -122,66 +78,21 @@ export default function Dashboard() {
 
     const refreshDashboard = async ({ showLoading = false } = {}) => {
       if (showLoading) {
-        setAttendanceLoading(true);
         setAnniversariesLoading(true);
         setBirthdaysLoading(true);
       }
 
-      const { role } = getUserFromToken();
-      const todayDate = getTodayDate();
-      const attendanceRequest =
-        role === ROLES.ADMIN || role === ROLES.HR
-          ? getAllAttendance(todayDate)
-          : getAttendance();
-
       const [
-        attendanceResult,
         holidaysResult,
         anniversariesResult,
         birthdaysResult,
       ] = await Promise.allSettled([
-        attendanceRequest,
         getUpcomingHolidays(),
         getTodayWorkAnniversaries(),
         getTodayBirthdays(),
       ]);
 
       if (!isMounted) return;
-
-      if (attendanceResult.status === "fulfilled") {
-        const normalized = (Array.isArray(attendanceResult.value) ? attendanceResult.value : [])
-          .filter((record) => {
-            const recordDate =
-              record.dateISO || record.inISO?.slice(0, 10) || record.outISO?.slice(0, 10) || "";
-            const hasInTime = Boolean(record.inTime && record.inTime !== "—");
-            return recordDate === todayDate && hasInTime;
-          })
-          .map((record, index) => {
-            const name = record.employeeName || "Employee";
-            const initials = name
-              .split(" ")
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((part) => part[0]?.toUpperCase())
-              .join("");
-
-            return {
-              id: record.id || `${name}-${index}`,
-              name,
-              initials: initials || "NA",
-              inTime: record.inTime || "—",
-              outTime: record.outTime || "—",
-              workingHours: record.workingHours || "—",
-              status: deriveAttendanceStatus(record),
-            };
-          })
-          .slice(0, 5);
-
-        setTodayAttendance(normalized);
-      } else {
-        console.error("❌ Failed to load today's attendance:", attendanceResult.reason);
-        setTodayAttendance([]);
-      }
 
       if (holidaysResult.status === "fulfilled") {
         const normalized = (Array.isArray(holidaysResult.value) ? holidaysResult.value : []).map(
@@ -296,7 +207,6 @@ export default function Dashboard() {
         setBirthdays([]);
       }
 
-      setAttendanceLoading(false);
       setAnniversariesLoading(false);
       setBirthdaysLoading(false);
     };
@@ -336,57 +246,7 @@ export default function Dashboard() {
 
         {/* Bottom Section */}
         <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-4 mt-5">
-          {/* Today's Attendance */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-gray-800">Today's Attendance</h2>
-            </div>
-            {attendanceLoading ? (
-              <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                Loading attendance...
-              </div>
-            ) : todayAttendance.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                No attendance records for today.
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {todayAttendance.map((item) => {
-                  const statusMeta =
-                    item.status === "ABSENT"
-                      ? null
-                      : ATTENDANCE_STATUS_META[item.status] || ATTENDANCE_STATUS_META.PRESENT;
-
-                  return (
-                    <li
-                      key={item.id}
-                      className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
-                        {item.initials}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-800">
-                          {item.name}
-                        </p>
-                        <p className="truncate text-xs text-gray-500">
-                          In: {item.inTime} • Out: {item.outTime} • Hours: {item.workingHours}
-                        </p>
-                      </div>
-                      {statusMeta ? (
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${statusMeta.badgeClass}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${statusMeta.dotClass}`} />
-                          {statusMeta.label}
-                        </span>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+          <AttendanceChartCard />
 
           {/* Upcoming Holidays + Highlights */}
           <div className="flex flex-col gap-6">

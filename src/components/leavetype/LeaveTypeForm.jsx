@@ -34,7 +34,12 @@ export default function LeaveTypeForm({
   }, [isEdit, initial]);
 
   const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const normalizedValue =
+      field === "type" && typeof value === "string"
+        ? value.toLowerCase()
+        : value;
+
+    setForm((prev) => ({ ...prev, [field]: normalizedValue }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
   };
 
@@ -62,7 +67,7 @@ export default function LeaveTypeForm({
 
   const handleSubmit = () => {
     if (!validate()) return;
-    onSubmit({ ...form, type: form.type.trim() });
+    onSubmit({ ...form, type: form.type.trim().toLowerCase() });
   };
 
   const handleBackdrop = (e) => {

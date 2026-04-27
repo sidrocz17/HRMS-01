@@ -3,6 +3,7 @@
 import axios from "axios";
 import { buildApiUrl } from "./apiBase";
 import { getToken, getUserFromToken } from "../utils/auth.js";
+import { formatLocalTime } from "../utils/dateUtils.js";
 
 const authHeaders = () => ({
   headers: {
@@ -76,14 +77,7 @@ const pad = (value) => String(value).padStart(2, "0");
 const formatDisplayDate = (value) => {
   const iso = toIsoString(value);
   if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatLocalTime(iso).split(", ")[0] || "—";
 };
 
 const formatDisplayTime = (value) => {
@@ -101,14 +95,7 @@ const formatDisplayTime = (value) => {
 
   const iso = toIsoString(value);
   if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? "PM" : "AM";
-  const hh = hours % 12 || 12;
-  return `${pad(hh)}:${pad(minutes)} ${ampm}`;
+  return formatLocalTime(iso).split(", ")[1] || "—";
 };
 
 const calcWorkingHours = (inISO, outISO) => {

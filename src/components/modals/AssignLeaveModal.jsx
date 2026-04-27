@@ -67,9 +67,6 @@ export default function AssignLeaveModal({
           <h2 className="text-lg font-semibold text-gray-900">
             Assign Leave to Employee
           </h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Employee ID: <span className="font-mono font-medium">{employeeId}</span>
-          </p>
         </div>
 
         {/* Body */}

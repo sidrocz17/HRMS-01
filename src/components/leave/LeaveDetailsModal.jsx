@@ -136,10 +136,6 @@ export default function LeaveDetailsModal({
 
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailItem
-                  label="Leave Application ID"
-                  value={formatValue(details.leaveApplicationId)}
-                />
-                <DetailItem
                   label="Leave Type"
                   value={formatValue(details.leaveType)}
                 />

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { changePassword } from "../../api/authApi";
 import { setForcePasswordReset } from "../../utils/authStorage";
 import { logoutAndRedirect } from "../../utils/auth";
+import { extractApiErrorMessage } from "../../utils/error";
 
 const EyeIcon = ({ open }) => open ? (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -102,9 +103,7 @@ export default function ResetPasswordForm({
       }, 1200);
     } catch (error) {
       setResetError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to change password right now."
+        extractApiErrorMessage(error, "Unable to change password right now."),
       );
     } finally {
       setIsResettingPassword(false);

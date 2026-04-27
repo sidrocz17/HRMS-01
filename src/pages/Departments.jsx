@@ -20,6 +20,7 @@ import {
   updateDepartment,
 } from "../api/departmentApi";
 import { formatDisplayDate } from "../utils/date";
+import { extractApiErrorMessage } from "../utils/error";
 
 const PAGE_SIZE = 7;
 
@@ -150,14 +151,7 @@ export default function Departments() {
         normalizeDepartment(department, index),
       );
 
-      setDepartments((prev) => {
-        const fetchedIds = new Set(mapped.map((dept) => dept.id));
-        const missingLocalRows = prev.filter(
-          (dept) => !fetchedIds.has(dept.id),
-        );
-
-        return [...mapped, ...missingLocalRows];
-      });
+      setDepartments(mapped);
     } catch (error) {
       console.error("❌ Failed to fetch departments:", error);
     } finally {
@@ -224,10 +218,10 @@ export default function Departments() {
       setViewTarget(normalizeDepartment(response));
     } catch (error) {
       console.error("❌ Failed to fetch department details:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Failed to load department details. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to load department details. Please try again.",
+      );
       setApiError(message);
     } finally {
       setViewLoading(false);
@@ -259,10 +253,10 @@ export default function Departments() {
       setShowMapModal(true);
     } catch (error) {
       console.error("❌ Failed to load department mappings:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Failed to load designations for mapping. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to load designations for mapping. Please try again.",
+      );
       setMapApiError(message);
       setShowMapModal(true);
     } finally {
@@ -345,7 +339,7 @@ export default function Departments() {
 
     try {
       await deleteDepartment(deleteTarget.id);
-      setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      await loadDepartments();
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (error) {
@@ -368,7 +362,7 @@ export default function Departments() {
 
     try {
       await Promise.all(selectedIds.map((id) => deleteDepartment(id)));
-      setDepartments((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      await loadDepartments();
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Failed to delete selected departments:", error);
@@ -388,13 +382,7 @@ export default function Departments() {
 
     try {
       await deactivateDepartment(dept.id);
-      setDepartments((prev) =>
-        prev.map((item) =>
-          item.id === dept.id
-            ? normalizeDepartment({ ...item, is_active: false })
-            : item,
-        ),
-      );
+      await loadDepartments();
     } catch (error) {
       console.error("❌ Failed to deactivate department:", error);
       const message =
@@ -895,14 +883,6 @@ export default function Departments() {
 
             <div className="px-6 py-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Department ID
-                  </p>
-                  <p className="mt-1 break-all text-sm font-medium text-gray-800">
-                    {viewTarget.dept_id || "—"}
-                  </p>
-                </div>
                 <div className="rounded-xl bg-slate-50 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                     Status

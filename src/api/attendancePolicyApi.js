@@ -6,6 +6,7 @@
 
 import axios from "axios";
 import { buildApiUrl } from "./apiBase";
+import { getUserFromToken } from "../utils/auth.js";
 
 const authHeaders = () => ({
   headers: {
@@ -26,12 +27,20 @@ export const fetchAttendancePolicy = async () => {
 // Creates the attendance policy (admin only)
 // Request body: { minWorkingHour, halfDayHour }
 export const createAttendancePolicy = async (payload) => {
-  const body = {
-    minWorkingHour: Number(payload.min_working_hour),
-    halfDayHour: Number(payload.half_day_hour),
+  const { userId } = getUserFromToken();
+  const normalizeTime = (value) => {
+    if (!value) return "";
+    const trimmed = String(value).trim();
+    return /^\d{2}:\d{2}$/.test(trimmed) ? `${trimmed}:00` : trimmed;
   };
 
-  console.log("📤 Creating attendance policy:", body);
+  const body = {
+    minInTime: normalizeTime(payload.min_in_time),
+    minOutTime: normalizeTime(payload.min_out_time),
+    minWorkingHour: Number(payload.min_working_hour),
+    halfDayHour: Number(payload.half_day_hour),
+    createdBy: payload.createdBy || userId,
+  };
   const response = await axios.post(
     buildApiUrl("/attendance-policy"),
     body,
@@ -44,7 +53,15 @@ export const createAttendancePolicy = async (payload) => {
 // Updates the attendance policy
 // Request body: { minWorkingHour, halfDayHour }
 export const updateAttendancePolicy = async (attPolicyId, payload) => {
+  const normalizeTime = (value) => {
+    if (!value) return "";
+    const trimmed = String(value).trim();
+    return /^\d{2}:\d{2}$/.test(trimmed) ? `${trimmed}:00` : trimmed;
+  };
+
   const body = {
+    minInTime: normalizeTime(payload.min_in_time),
+    minOutTime: normalizeTime(payload.min_out_time),
     minWorkingHour: Number(payload.min_working_hour),
     halfDayHour: Number(payload.half_day_hour),
   };

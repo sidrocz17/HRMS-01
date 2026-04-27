@@ -16,10 +16,12 @@ import {
   updateLeavePolicy,
   deleteLeavePolicy,
   fetchLeavePolicies,
+  fetchLeavePolicyById,
   fetchLeaveTypes,
   fetchEmployeeTypes,
 } from "../api/leavePolicyApi";
 import { getRoleFromToken, getUserIdFromToken } from "../utils/auth.js";
+import { extractApiErrorMessage } from "../utils/error";
 
 const PAGE_SIZE = 8;
 
@@ -78,7 +80,7 @@ const normalizeLabelValue = (value) => {
 };
 
 const mapOption = (item = {}, idKeys = [], labelKeys = []) => ({
-  id: idKeys.map((key) => item?.[key]).find(Boolean) || "",
+  id: String(idKeys.map((key) => item?.[key]).find(Boolean) || ""),
   label:
     labelKeys.map((key) => normalizeLabelValue(item?.[key])).find(Boolean) ||
     "",
@@ -115,19 +117,49 @@ const mapEmployeeTypeOption = (item) =>
   );
 
 const mapPolicyItem = (d = {}) => ({
-  id: d.policyId || d.id || d.policy_id || uuidv4(),
-  type_id: d.typeId || d.type_id || "",
-  employee_type_id:
-    d.employeeTypeId ||
-    d.employee_type_id ||
-    d.employmentTypeId ||
-    d.employment_type_id ||
+  id:
+    d.leavePolicyId ||
+    d.leave_policy_id ||
+    d.policyId ||
+    d.policy_id ||
+    d.id ||
+    uuidv4(),
+  type_id: String(
+    d.leaveType?.typeId ||
+    d.leaveType?.id ||
+    d.leave_type?.typeId ||
+    d.leave_type?.id ||
+    d.leaveTypeId ||
+    d.leave_type_id ||
+    d.typeId ||
+    d.type_id ||
     "",
-  no_of_days: d.noOfDays ?? d.no_of_days ?? 0,
-  start_date: d.startDate || d.start_date || "",
-  end_date: d.endDate || d.end_date || "",
-  financial_year: getCalendarYearLabel(d.startDate || d.start_date),
+  ),
+  employee_type_id:
+    String(
+      d.employmentType?.id ||
+      d.employmentType?.employeeTypeId ||
+      d.employeeType?.id ||
+      d.employeeType?.employeeTypeId ||
+      d.employment_type?.id ||
+      d.employment_type?.employeeTypeId ||
+      d.employeeTypeId ||
+      d.employee_type_id ||
+      d.employmentTypeId ||
+      d.employment_type_id ||
+      "",
+    ),
+  no_of_days: d.noOfDays ?? d.no_of_days ?? d.noOfLeave ?? d.no_of_leave ?? 0,
+  start_date: d.startDate || d.start_date || d.fromDate || d.from_date || "",
+  end_date: d.endDate || d.end_date || d.toDate || d.to_date || "",
+  financial_year: String(
+    d.financial_year ||
+    d.year ||
+    getCalendarYearLabel(d.startDate || d.start_date || d.fromDate || d.from_date),
+  ),
   leave_type_label:
+    normalizeLabelValue(d.leaveType) ||
+    normalizeLabelValue(d.leave_type) ||
     normalizeLabelValue(d.leaveTypeName) ||
     normalizeLabelValue(d.leave_type_name) ||
     normalizeLabelValue(d.leaveType) ||
@@ -137,6 +169,9 @@ const mapPolicyItem = (d = {}) => ({
     normalizeLabelValue(d.type) ||
     "",
   employee_type_label:
+    normalizeLabelValue(d.employmentType) ||
+    normalizeLabelValue(d.employment_type) ||
+    normalizeLabelValue(d.employeeType) ||
     normalizeLabelValue(d.employeeTypeName) ||
     normalizeLabelValue(d.employee_type_name) ||
     normalizeLabelValue(d.employeeType) ||
@@ -250,16 +285,13 @@ export default function LeavePolicy() {
         employeeTypesResult.status === "rejected"
       ) {
         const error = employeeTypesResult.reason || leaveTypesResult.reason;
-        setApiError(
-          error?.response?.data?.message ||
-            error?.response?.data?.error ||
-            "Failed to load form dropdown data.",
-        );
+        setApiError(extractApiErrorMessage(error, "Failed to load form dropdown data."));
       } else if (policiesResult.status === "rejected") {
         setApiError(
-          policiesResult.reason?.response?.data?.message ||
-            policiesResult.reason?.response?.data?.error ||
+          extractApiErrorMessage(
+            policiesResult.reason,
             "Leave policies could not be loaded, but you can still add a policy.",
+          ),
         );
       }
     } catch (error) {
@@ -335,11 +367,41 @@ export default function LeavePolicy() {
     setShowForm(true);
   };
 
-  const handleEdit = (policy) => {
-    setFormMode("edit");
-    setEditTarget(policy);
+  const handleEdit = async (policy) => {
+    if (!policy?.id) {
+      setApiError("Unable to identify the policy to edit.");
+      return;
+    }
+
+    setSubmitting(true);
     setApiError("");
-    setShowForm(true);
+
+    try {
+      const response = await fetchLeavePolicyById(policy.id);
+      const payload =
+        response?.data ||
+        response?.item ||
+        response?.result ||
+        response?.payload ||
+        response;
+
+      setFormMode("edit");
+      setEditTarget(mapPolicyItem(payload));
+      setShowForm(true);
+    } catch (error) {
+      console.error("❌ Failed to load leave policy details:", error);
+      setFormMode("edit");
+      setEditTarget(mapPolicyItem(policy));
+      setShowForm(true);
+
+      const message = extractApiErrorMessage(
+        error,
+        "Loaded table data because the latest policy details could not be fetched.",
+      );
+      setApiError(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleFormSubmit = async (formData) => {
@@ -405,10 +467,10 @@ export default function LeavePolicy() {
       setCurrentPage(1);
     } catch (error) {
       console.error("❌ API Error:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Something went wrong. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Something went wrong. Please try again.",
+      );
       setApiError(message);
     } finally {
       setSubmitting(false);
@@ -430,11 +492,7 @@ export default function LeavePolicy() {
       setDeleteTarget(null);
     } catch (error) {
       console.error("❌ Delete API Error:", error);
-      setApiError(
-        error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          "Failed to delete leave policy.",
-      );
+      setApiError(extractApiErrorMessage(error, "Failed to delete leave policy."));
     }
   };
 
@@ -449,9 +507,7 @@ export default function LeavePolicy() {
     } catch (error) {
       console.error("❌ Bulk delete API Error:", error);
       setApiError(
-        error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          "Failed to delete selected leave policies.",
+        extractApiErrorMessage(error, "Failed to delete selected leave policies."),
       );
     }
   };
@@ -476,7 +532,7 @@ export default function LeavePolicy() {
 
   // ── Existing keys for duplicate detection ─────
   const existingKeys = policies.map(
-    (p) => `${p.type_id}_${p.employee_type_id}_${p.financial_year}`,
+    (p) => `${p.type_id}_${p.employee_type_id}`,
   );
 
   // ── Access Denied ─────────────────────────────

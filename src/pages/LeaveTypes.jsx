@@ -15,6 +15,7 @@ import {
   fetchLeaveTypes,
 } from "../api/leaveTypeApi";
 import { getRoleFromToken } from "../utils/auth.js";
+import { extractApiErrorMessage } from "../utils/error";
 
 const PAGE_SIZE = 8;
 
@@ -182,10 +183,10 @@ export default function LeaveTypes() {
 
     } catch (error) {
       console.error("❌ API Error:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error   ||
-        "Something went wrong. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Something went wrong. Please try again.",
+      );
       setApiError(message);
 
     } finally {
@@ -206,15 +207,15 @@ export default function LeaveTypes() {
 
     try {
       await deleteLeaveType(deleteTarget.id);
-      setLeaveTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      await loadLeaveTypes();
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (error) {
       console.error("❌ Failed to delete leave type:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Failed to delete leave type. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to delete leave type. Please try again.",
+      );
       setApiError(message);
     } finally {
       setDeleteSubmitting(false);
@@ -229,14 +230,14 @@ export default function LeaveTypes() {
 
     try {
       await Promise.all(selectedIds.map((id) => deleteLeaveType(id)));
-      setLeaveTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      await loadLeaveTypes();
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Failed to delete selected leave types:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Failed to delete selected leave types. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to delete selected leave types. Please try again.",
+      );
       setApiError(message);
     } finally {
       setDeleteSubmitting(false);

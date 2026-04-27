@@ -4,11 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
 import { buildUrl } from "../api/apiBase";
 import { getUserFromToken } from "../utils/auth.js";
+import { extractApiErrorMessage } from "../utils/error.js";
 import {
   setForcePasswordReset,
   setSessionTokens,
   shouldForcePasswordReset,
 } from "../utils/authStorage";
+import HonestLoginImage from "../assets/Honest.jpg";
 
 const NetworkIcon = () => (
   <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -121,10 +123,7 @@ export default function XcelTechSplitLogin() {
     } catch (error) {
       const status = error.response?.status;
       const errorData = error.response?.data;
-      const message =
-        errorData?.message ||
-        error.message ||
-        "Login failed ❌";
+      const message = extractApiErrorMessage(error, "Login failed.");
 
       console.error("Login error:", {
         url: buildUrl("/auth/login"),

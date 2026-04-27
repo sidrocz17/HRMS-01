@@ -6,7 +6,6 @@
 // ─────────────────────────────────────────────
 
 import { useEffect, useState, useMemo } from "react";
-import { v4 as uuidv4 } from "uuid";
 import StatusBadge      from "../components/employee/StatusBadge";
 import DesignationForm  from "../components/designation/DesignationForm";
 import DeleteConfirm    from "../components/designation/DeleteConfirm";
@@ -16,6 +15,7 @@ import {
   updateDesignation,
 } from "../api/designationApi";
 import { formatDisplayDate } from "../utils/date";
+import { extractApiErrorMessage } from "../utils/error";
 
 const PAGE_SIZE = 8;
 
@@ -95,14 +95,7 @@ export default function Designations() {
         normalizeDesignation(designation, index)
       );
 
-      setDesignations((prev) => {
-        const fetchedIds = new Set(mapped.map((designation) => designation.id));
-        const missingLocalRows = prev.filter(
-          (designation) => !fetchedIds.has(designation.id)
-        );
-
-        return [...mapped, ...missingLocalRows];
-      });
+      setDesignations(mapped);
     } catch (error) {
       console.error("❌ Failed to fetch designations:", error);
     } finally {
@@ -159,64 +152,47 @@ export default function Designations() {
     setSubmitting(true);
     setApiError("");
 
-    const now = new Date().toLocaleDateString("en-GB", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
-
     try {
       if (formMode === "add") {
         const response = await createDesignation(formData);
         const createdDesignation = response?.data || response;
 
-        setDesignations((prev) => [{
-          id: createdDesignation?.id || createdDesignation?.designationId || uuidv4(),
-          title: createdDesignation?.title || createdDesignation?.designationName || formData.title,
-          description: createdDesignation?.description || formData.description,
-          is_active:
-            createdDesignation?.isActive ??
-            createdDesignation?.is_active ??
-            formData.is_active,
-          created_at:
-            formatDisplayDate(createdDesignation?.createdAt || createdDesignation?.created_at) || now,
-          updated_at:
-            formatDisplayDate(createdDesignation?.updatedAt || createdDesignation?.updated_at) || now,
-        }, ...prev]);
+        setDesignations((prev) => [
+          normalizeDesignation(
+            {
+              ...createdDesignation,
+              title:
+                createdDesignation?.title ||
+                createdDesignation?.designationName ||
+                formData.title,
+              description:
+                createdDesignation?.description ?? formData.description,
+              isActive:
+                createdDesignation?.isActive ??
+                createdDesignation?.is_active ??
+                formData.is_active,
+              createdOn:
+                createdDesignation?.createdOn ||
+                createdDesignation?.created_at ||
+                new Date().toISOString(),
+            },
+            prev.length,
+          ),
+          ...prev,
+        ]);
       } else {
-        const response = await updateDesignation(editTarget.id, formData);
-        const updatedDesignation = response?.data || response;
-
-        setDesignations((prev) =>
-          prev.map((d) =>
-            d.id === editTarget.id
-              ? {
-                  ...d,
-                  title:
-                    updatedDesignation?.title ||
-                    updatedDesignation?.designationName ||
-                    formData.title,
-                  description:
-                    updatedDesignation?.description ?? formData.description,
-                  is_active:
-                    updatedDesignation?.isActive ??
-                    updatedDesignation?.is_active ??
-                    formData.is_active,
-                  updated_at:
-                    formatDisplayDate(updatedDesignation?.updatedAt || updatedDesignation?.updated_at) ||
-                    now,
-                }
-              : d
-          )
-        );
+        await updateDesignation(editTarget.id, formData);
+        await loadDesignations();
       }
 
       setShowForm(false);
       setCurrentPage(1);
     } catch (error) {
       console.error("❌ Failed to save designation:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Failed to save designation. Please try again.";
+      const message = extractApiErrorMessage(
+        error,
+        "Failed to save designation. Please try again.",
+      );
       setApiError(message);
     } finally {
       setSubmitting(false);
