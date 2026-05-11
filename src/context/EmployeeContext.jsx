@@ -167,11 +167,40 @@ const loadEmployees = async () => {
   return employeeRequest;
 };
 
+const fetchFreshEmployees = async () => {
+  const response = await getAllEmployees();
+  const normalizedEmployees = pickEmployeeList(response).map(normalizeEmployee);
+  employeeCache = normalizedEmployees;
+  return normalizedEmployees;
+};
+
 export function EmployeeProvider({ children }) {
   const { pathname } = useLocation();
   const [employees, setEmployees] = useState(() => employeeCache || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const refreshEmployees = async () => {
+    setLoading(true);
+    setError("");
+    clearEmployeeCache();
+
+    try {
+      const employeeList = await fetchFreshEmployees();
+      setEmployees(employeeList);
+      return employeeList;
+    } catch (fetchError) {
+      setEmployees([]);
+      setError(
+        fetchError?.response?.data?.message ||
+          fetchError?.message ||
+          "Failed to load employees"
+      );
+      throw fetchError;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -230,6 +259,7 @@ export function EmployeeProvider({ children }) {
     () => ({
       employees,
       setEmployees,
+      refreshEmployees,
       employeeMap,
       loading,
       error,

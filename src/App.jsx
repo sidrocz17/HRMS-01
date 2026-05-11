@@ -47,8 +47,6 @@ function DashboardLayout({ page }) {
     "reports/leave": <LeaveReports />,
     "reports/attendance": <AttendanceReports />,
     "reset-password": <ResetPassword />,
-    // employees: <Employee />,  ← uncomment when built
-    // payroll:   <Payroll />,   ← uncomment when built
   };
 
   return (

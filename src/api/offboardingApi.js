@@ -36,7 +36,7 @@ export const applyResignation = async (payload) => {
 };
 
 // ── POST /offboarding/termination ────────────
-// Payload: { empId, terminationDate, reason, feedback, isGoodToRehire }
+// Payload: { empId, terminationDate, reason, feedback }
 export const initiateTermination = async (payload) => {
   const response = await axios.post(
     buildApiUrl("/offboarding/termination"),
@@ -47,7 +47,7 @@ export const initiateTermination = async (payload) => {
 };
 
 // ── PUT /offboarding/resignation/:id/action ───
-// Payload: { status, finalLastWorkingDate, feedback, isGoodToRehire }
+// Payload: { status, finalLastWorkingDate, feedback }
 // Response: { offboardingId, employeeName, status, finalLastWorkingDate }
 export const approveRejectOffboarding = async (offboardingId, payload) => {
   const response = await axios.put(

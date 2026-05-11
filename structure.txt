@@ -1,0 +1,152 @@
+├── ./
+│   ├── .gitignore
+│   ├── .env.development
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── package-lock.json
+│   ├── README.md
+│   ├── .env.production
+│   ├── structure.txt
+│   ├── index.html
+│   ├── eslint.config.js
+│   ├── public/
+│   │   ├── vite.svg
+│   ├── src/
+│   │   ├── App.css
+│   │   ├── main.jsx
+│   │   ├── index.css
+│   │   ├── App.jsx
+│   │   ├── utils/
+│   │   │   ├── employeeUtils.js
+│   │   │   ├── dateUtils.js
+│   │   │   ├── authStorage.js
+│   │   │   ├── date.js
+│   │   │   ├── error.js
+│   │   │   ├── auth.js
+│   │   ├── pages/
+│   │   │   ├── Designations.jsx
+│   │   │   ├── Login.jsx
+│   │   │   ├── MyProfile.jsx
+│   │   │   ├── EmployeeManagement.jsx
+│   │   │   ├── EmployeeTypes.jsx
+│   │   │   ├── Attendance.jsx
+│   │   │   ├── AttendanceReports.jsx
+│   │   │   ├── LeaveTypes.jsx
+│   │   │   ├── LeaveReports.jsx
+│   │   │   ├── EmployeeOnboarding.jsx
+│   │   │   ├── Departments.jsx
+│   │   │   ├── HolidayCalendar.jsx
+│   │   │   ├── LeavePolicy.jsx
+│   │   │   ├── LeaveManagement.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── ResetPassword.jsx
+│   │   │   ├── AttendancePolicy.jsx
+│   │   │   ├── DashboardEmp.jsx
+│   │   │   ├── Offboarding.jsx
+│   │   ├── hooks/
+│   │   │   ├── useEmployee.js
+│   │   │   ├── useAuth.js
+│   │   ├── config/
+│   │   │   ├── roles.jsx
+│   │   ├── services/
+│   │   ├── components/
+│   │   │   ├── ProtectedRoute.jsx
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── DashboardCards.jsx
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── auth/
+│   │   │   │   ├── ResetPasswordForm.jsx
+│   │   │   ├── reports/
+│   │   │   │   ├── FiltersBar.jsx
+│   │   │   │   ├── ReportsTable.jsx
+│   │   │   ├── leave/
+│   │   │   │   ├── CancelLeaveModal.jsx
+│   │   │   │   ├── ApproveLeaveModal.jsx
+│   │   │   │   ├── LeaveBalanceSection.jsx
+│   │   │   │   ├── TeamLeaveTable.jsx
+│   │   │   │   ├── LeaveTable.jsx
+│   │   │   │   ├── ApplyLeaveModal.jsx
+│   │   │   │   ├── LeaveDetailsModal.jsx
+│   │   │   ├── modals/
+│   │   │   │   ├── PostYearlyLeavesModal.jsx
+│   │   │   │   ├── AssignLeaveModal.jsx
+│   │   │   │   ├── SuccessModal.jsx
+│   │   │   ├── attendancePage/
+│   │   │   │   ├── ThoughtCard.jsx
+│   │   │   │   ├── AttendanceTable.jsx
+│   │   │   │   ├── AttendanceCard.jsx
+│   │   │   ├── employee/
+│   │   │   │   ├── ActionButtons.jsx
+│   │   │   │   ├── StatusBadge.jsx
+│   │   │   ├── department/
+│   │   │   │   ├── MapDesignationsModal.jsx
+│   │   │   │   ├── DepartmentForm.jsx
+│   │   │   │   ├── DeleteConfirm.jsx
+│   │   │   ├── holiday/
+│   │   │   │   ├── useHolidays.js
+│   │   │   │   ├── HolidayForm.jsx
+│   │   │   │   ├── DeleteConfirm.jsx
+│   │   │   ├── employee_OB/
+│   │   │   │   ├── onboarding/
+│   │   │   │   │   ├── PreviousEmploymentStep.jsx
+│   │   │   │   │   ├── ReviewStep.jsx
+│   │   │   │   │   ├── BasicInfoStep.jsx
+│   │   │   │   │   ├── JobDetailsStep.jsx
+│   │   │   │   │   ├── IdentityStep.jsx
+│   │   │   │   │   ├── Stepper.jsx
+│   │   │   │   │   ├── DocumentUploadStep.jsx
+│   │   │   ├── profile/
+│   │   │   │   ├── JobInfo.jsx
+│   │   │   │   ├── ProfileHeader.jsx
+│   │   │   │   ├── PersonalInfo.jsx
+│   │   │   │   ├── IdentityInfo.jsx
+│   │   │   ├── leavepolicy/
+│   │   │   │   ├── DeleteConfirm.jsx
+│   │   │   │   ├── LeavePolicyForm.jsx
+│   │   │   ├── designation/
+│   │   │   │   ├── DesignationForm.jsx
+│   │   │   │   ├── DeleteConfirm.jsx
+│   │   │   ├── employeeManagement/
+│   │   │   │   ├── DeactivateModal.jsx
+│   │   │   │   ├── EmployeeRecordsModal.jsx
+│   │   │   │   ├── EmployeeTable.jsx
+│   │   │   ├── employeetype/
+│   │   │   │   ├── EmployeeTypeForm.jsx
+│   │   │   │   ├── DeleteConfirm.jsx
+│   │   │   ├── offboarding/
+│   │   │   │   ├── TerminationTable.jsx
+│   │   │   │   ├── OffboardingTable.jsx
+│   │   │   │   ├── ApprovalModal.jsx
+│   │   │   ├── leavetype/
+│   │   │   │   ├── DeleteConfirm.jsx
+│   │   │   │   ├── LeaveTypeForm.jsx
+│   │   │   ├── attendance/
+│   │   │   │   ├── AttendancePolicyForm.jsx
+│   │   │   ├── dashboard/
+│   │   │   │   ├── AttendanceChartCard.jsx
+│   │   │   │   ├── DashboardCards.jsx
+│   │   ├── context/
+│   │   │   ├── EmployeeContext.jsx
+│   │   ├── api/
+│   │   │   ├── holidayApi.js
+│   │   │   ├── designationApi.js
+│   │   │   ├── leaveTypeApi.js
+│   │   │   ├── httpClient.js
+│   │   │   ├── offboardingApi.js
+│   │   │   ├── authApi.js
+│   │   │   ├── apiBase.js
+│   │   │   ├── deptDesigApi.js
+│   │   │   ├── employeeTypeApi.js
+│   │   │   ├── leavePolicyApi.js
+│   │   │   ├── profileApi.js
+│   │   │   ├── departmentApi.js
+│   │   │   ├── employeeApi.js
+│   │   │   ├── attendanceApi.js
+│   │   │   ├── userApi.js
+│   │   │   ├── leaveApi.js
+│   │   │   ├── employeeManagementApi.js
+│   │   │   ├── dashboardApi.js
+│   │   │   ├── attendancePolicyApi.js
+│   │   ├── assets/
+│   │   │   ├── Honest.jpg
+│   │   │   ├── react.svg

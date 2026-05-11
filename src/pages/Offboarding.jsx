@@ -427,7 +427,6 @@ export default function Offboarding() {
         terminationDate: terminationForm.terminationDate,
         reason: terminationForm.reason.trim(),
         feedback: terminationForm.feedback.trim(),
-        isGoodToRehire: terminationForm.isGoodToRehire,
       };
 
       const response = await initiateTermination(payload);
@@ -505,7 +504,7 @@ export default function Offboarding() {
                   isGoodToRehire:
                     typeof response?.isGoodToRehire === "boolean"
                       ? response.isGoodToRehire
-                      : actionPayload.isGoodToRehire,
+                      : record.isGoodToRehire,
                 }
               : record
           )
@@ -1042,7 +1041,7 @@ export default function Offboarding() {
                 <TerminationErrMsg field="feedback" />
               </div>
 
-              <div className="flex items-center justify-between py-1">
+              {/* <div className="flex items-center justify-between py-1">
                 <div>
                   <p className="text-sm font-medium text-gray-700">
                     Eligible for Rehire
@@ -1052,8 +1051,8 @@ export default function Offboarding() {
                       ? "Employee can be rehired in the future"
                       : "Employee is not eligible for rehire"}
                   </p>
-                </div>
-                <button
+                </div> */}
+                {/* <button
                   type="button"
                   onClick={() =>
                     handleTerminationChange(
@@ -1075,8 +1074,8 @@ export default function Offboarding() {
                         : "translate-x-1"
                     }`}
                   />
-                </button>
-              </div>
+                </button> */}
+              {/* </div> */}
             </div>
 
             {terminationApiError && (

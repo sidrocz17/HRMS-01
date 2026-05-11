@@ -56,24 +56,24 @@ export default function ApprovalModal({
     return Object.keys(newErrors).length === 0;
   };
 
+  const buildActionPayload = (status) => ({
+    status,
+    finalLastWorkingDate:
+      status === "APPROVED"
+        ? form.finalLastWorkingDate
+        : form.finalLastWorkingDate || null,
+    feedback: form.feedback.trim(),
+    ...(isTermination ? {} : { isGoodToRehire: form.isGoodToRehire }),
+  });
+
   const handleApprove = () => {
     if (!validate("APPROVED")) return;
-    onApprove({
-      status:               "APPROVED",
-      finalLastWorkingDate: form.finalLastWorkingDate,
-      feedback:             form.feedback.trim(),
-      isGoodToRehire:       form.isGoodToRehire,
-    });
+    onApprove(buildActionPayload("APPROVED"));
   };
 
   const handleReject = () => {
     if (!validate("REJECTED")) return;
-    onReject({
-      status:               "REJECTED",
-      finalLastWorkingDate: form.finalLastWorkingDate || null,
-      feedback:             form.feedback.trim(),
-      isGoodToRehire:       form.isGoodToRehire,
-    });
+    onReject(buildActionPayload("REJECTED"));
   };
 
   const handleBackdrop = (e) => {

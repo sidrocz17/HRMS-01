@@ -18,6 +18,7 @@ import SuccessModal from "../components/modals/SuccessModal";
 import AssignLeaveModal from "../components/modals/AssignLeaveModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
 import { getUserFromToken } from "../utils/auth.js";
+import useEmployee from "../hooks/useEmployee";
 
 const STEPS = [
   { number: 1, label: "Basic Info" },
@@ -346,6 +347,7 @@ export default function EmployeeOnboarding() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { refreshEmployees } = useEmployee();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get("mode");
   const employeeId = searchParams.get("id");
@@ -787,6 +789,7 @@ export default function EmployeeOnboarding() {
       );
 
       if (isEditMode) {
+        await refreshEmployees();
         navigate("/employee-management");
         return;
       }
@@ -826,6 +829,9 @@ export default function EmployeeOnboarding() {
           ? ""
           : "Employee created, but employee ID was not returned for leave assignment",
       );
+      refreshEmployees().catch((refreshError) => {
+        console.error("❌ Failed to refresh employee list after onboarding:", refreshError);
+      });
       setShowSuccessModal(true);
     } catch (error) {
       console.error("❌ Error:", error);
