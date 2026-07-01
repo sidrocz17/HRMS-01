@@ -1,17 +1,20 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createEmployee as createEmployeeApi } from "../../api/employeeApi";
 import {
-  createContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { useLocation } from "react-router-dom";
-import { getAllEmployees } from "../api/employeeManagementApi";
-import {
-  getEmployeeDisplayName,
-  getEmployeeIdentityValues,
-} from "../utils/employeeUtils";
+  deactivateEmployee,
+  getAllEmployees,
+  updateEmployee,
+  updateEmployeeStatus,
+} from "../../api/employeeManagementApi";
+import { getApiErrorMessage } from "../../utils/leaveTransformers";
 
-export const EmployeeContext = createContext(null);
+export const employeeQueryKeys = {
+  all: ["employees"],
+  lists: () => [...employeeQueryKeys.all, "list"],
+  list: (params = {}) => [...employeeQueryKeys.lists(), params],
+};
+
+const EMPLOYEES_STALE_TIME = 2 * 60 * 1000;
 
 const pickEmployeeList = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -21,7 +24,7 @@ const pickEmployeeList = (payload) => {
   return [];
 };
 
-const normalizeEmployee = (employee = {}) => {
+export const normalizeEmployee = (employee = {}) => {
   const department = employee.department || employee.department_details || {};
   const designation =
     employee.designation || employee.designation_details || {};
@@ -139,107 +142,61 @@ const normalizeEmployee = (employee = {}) => {
   };
 };
 
-let employeeCache = null;
-let employeeRequest = null;
+export const normalizeEmployees = (payload) =>
+  pickEmployeeList(payload).map(normalizeEmployee);
 
-const clearEmployeeCache = () => {
-  employeeCache = null;
-  employeeRequest = null;
+const invalidateEmployeeQueries = (queryClient) =>
+  queryClient.invalidateQueries({ queryKey: employeeQueryKeys.all });
+
+const useEmployeeMutation = (mutationFn, fallbackMessage, options = {}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn,
+    onSuccess: async (data, variables, context) => {
+      await invalidateEmployeeQueries(queryClient);
+      options.onSuccess?.({ data }, variables, context);
+    },
+    onError: (error, variables, context) => {
+      options.onError?.(
+        {
+          error,
+          message: getApiErrorMessage(error, fallbackMessage),
+        },
+        variables,
+        context
+      );
+    },
+  });
 };
 
-const loadEmployees = async () => {
-  if (employeeCache) return employeeCache;
+export const useEmployees = (params = {}, options = {}) =>
+  useQuery({
+    queryKey: employeeQueryKeys.list(params),
+    queryFn: () => getAllEmployees(params),
+    enabled: options.enabled !== false,
+    staleTime: options.staleTime ?? EMPLOYEES_STALE_TIME,
+    select: normalizeEmployees,
+  });
 
-  if (!employeeRequest) {
-    employeeRequest = getAllEmployees()
-      .then((response) => {
-        const normalizedEmployees = pickEmployeeList(response).map(
-          normalizeEmployee
-        );
-        employeeCache = normalizedEmployees;
-        return normalizedEmployees;
-      })
-      .finally(() => {
-        employeeRequest = null;
-      });
-  }
-
-  return employeeRequest;
-};
-
-export function EmployeeProvider({ children }) {
-  const { pathname } = useLocation();
-  const [employees, setEmployees] = useState(() => employeeCache || []);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      clearEmployeeCache();
-      setEmployees([]);
-      setLoading(false);
-      setError("");
-      return;
-    }
-
-    if (employeeCache?.length) {
-      setEmployees(employeeCache);
-      return;
-    }
-
-    let isMounted = true;
-    setLoading(true);
-    setError("");
-
-    loadEmployees()
-      .then((employeeList) => {
-        if (!isMounted) return;
-        setEmployees(employeeList);
-      })
-      .catch((fetchError) => {
-        if (!isMounted) return;
-        setEmployees([]);
-        setError(
-          fetchError?.response?.data?.message ||
-            fetchError?.message ||
-            "Failed to load employees"
-        );
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [pathname]);
-
-  const employeeMap = useMemo(() => {
-    return employees.reduce((acc, employee) => {
-      const fullName = getEmployeeDisplayName(employee);
-      getEmployeeIdentityValues(employee).forEach((identityValue) => {
-        acc[identityValue] = fullName;
-      });
-      return acc;
-    }, {});
-  }, [employees]);
-
-  const value = useMemo(
-    () => ({
-      employees,
-      setEmployees,
-      employeeMap,
-      loading,
-      error,
-    }),
-    [employees, employeeMap, loading, error]
+export const useCreateEmployee = (options = {}) =>
+  useEmployeeMutation(
+    createEmployeeApi,
+    "Failed to create employee",
+    options
   );
 
-  return (
-    <EmployeeContext.Provider value={value}>
-      {children}
-    </EmployeeContext.Provider>
+export const useUpdateEmployee = (options = {}) =>
+  useEmployeeMutation(
+    ({ empId, data }) => updateEmployee(empId, data),
+    "Failed to update employee",
+    options
   );
-}
+
+export const useDeleteEmployee = (options = {}) =>
+  useEmployeeMutation(
+    ({ empId, statusData } = {}) =>
+      statusData ? updateEmployeeStatus(empId, statusData) : deactivateEmployee(empId),
+    "Failed to update employee status",
+    options
+  );

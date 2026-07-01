@@ -30,6 +30,20 @@ const ROLE_OPTIONS = [
   { value: ROLES.HR, label: "HR" },
 ];
 
+const ErrorMsg = ({ errors, field }) =>
+  errors[field] ? (
+    <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+          clipRule="evenodd"
+        />
+      </svg>
+      {errors[field]}
+    </p>
+  ) : null;
+
 export default function JobDetailsStep({
   data,
   errors,
@@ -46,20 +60,6 @@ export default function JobDetailsStep({
       ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
       : "border-gray-200 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
     }`;
-
-  const ErrorMsg = ({ field }) =>
-    errors[field] ? (
-      <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-        {errors[field]}
-      </p>
-    ) : null;
 
   return (
     <div className="space-y-6">
@@ -85,7 +85,7 @@ export default function JobDetailsStep({
                 </option>
               ))}
             </select>
-            <ErrorMsg field="dept_id" />
+            <ErrorMsg errors={errors} field="dept_id" />
           </div>
 
           <div>
@@ -107,7 +107,7 @@ export default function JobDetailsStep({
                 </option>
               ))}
             </select>
-            <ErrorMsg field="desig_id" />
+            <ErrorMsg errors={errors} field="desig_id" />
           </div>
 
           <div className="sm:col-span-2">
@@ -128,7 +128,7 @@ export default function JobDetailsStep({
                 </option>
               ))}
             </select>
-            <ErrorMsg field="employee_type_id" />
+            <ErrorMsg errors={errors} field="employee_type_id" />
           </div>
 
           <div>
@@ -147,7 +147,7 @@ export default function JobDetailsStep({
                 </option>
               ))}
             </select>
-            <ErrorMsg field="role" />
+            <ErrorMsg errors={errors} field="role" />
           </div>
 
           <div>
@@ -166,7 +166,7 @@ export default function JobDetailsStep({
                 </option>
               ))}
             </select>
-            <ErrorMsg field="reporting_manager" />
+            <ErrorMsg errors={errors} field="reporting_manager" />
           </div>
 
           <div>
@@ -179,7 +179,7 @@ export default function JobDetailsStep({
               onChange={(e) => onChange("jobDetails", "join_date", e.target.value)}
               className={inputClass("join_date")}
             />
-            <ErrorMsg field="join_date" />
+            <ErrorMsg errors={errors} field="join_date" />
           </div>
 
           <div>
@@ -194,7 +194,7 @@ export default function JobDetailsStep({
               onChange={(e) => onChange("jobDetails", "notice_period", e.target.value)}
               className={inputClass("notice_period")}
             />
-            <ErrorMsg field="notice_period" />
+            <ErrorMsg errors={errors} field="notice_period" />
           </div>
         </div>
       </div>

@@ -7,16 +7,18 @@
 //  Follows same patterns as Departments.jsx
 // ─────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import AttendancePolicyForm from "../components/attendance/AttendancePolicyForm";
 import { getRoleFromToken, getUserFromToken } from "../utils/auth.js";
 import {
-  createAttendancePolicy,
-  deleteAttendancePolicy,
-  fetchAttendancePolicy,
-  fetchAttendancePolicyHistory,
-  updateAttendancePolicy,
-} from "../api/attendancePolicyApi";
+  useAttendancePolicy,
+  useAttendancePolicyHistory,
+  useCreateAttendancePolicy,
+  useDeleteAttendancePolicy,
+  useUpdateAttendancePolicy,
+} from "../hooks/query/useAttendancePolicy";
+import { attendancePolicySchema } from "../schemas/attendancePolicySchema";
 import { fetchUsers } from "../api/userApi";
 import { getEmployees } from "../api/employeeManagementApi";
 
@@ -202,12 +204,8 @@ export default function AttendancePolicy() {
   const currentUser = getUserFromToken();
 
   // ── State ─────────────────────────────────────
-  const [policy, setPolicy]     = useState(null);
-  const [history, setHistory]   = useState([]);
-  const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
 
   const toInputTime = (timeValue) => {
@@ -387,21 +385,6 @@ export default function AttendancePolicy() {
     };
   };
 
-  const toHistoryRow = (item, userNameMap) => {
-    const normalized = normalizePolicy(item, userNameMap);
-    if (!normalized) return null;
-
-    return {
-      id: normalized.id || `policy-${Date.now()}`,
-      date: (normalized.updatedOn || new Date().toISOString()).slice(0, 10),
-      updatedBy: normalized.updatedBy || "—",
-      minInTime: normalized.minInTime,
-      minOutTime: normalized.minOutTime,
-      workingHours: normalized.minWorkingHour,
-      halfDayHours: normalized.halfDayHour,
-    };
-  };
-
   const normalizeHistoryRow = (item, userNameMap) => {
     if (!item) return null;
 
@@ -437,59 +420,59 @@ export default function AttendancePolicy() {
     };
   };
 
-  // ── Load data on mount ────────────────────────
-  useEffect(() => {
-    loadAll();
-  }, []);
+  const policyQuery = useAttendancePolicy();
+  const historyQuery = useAttendancePolicyHistory();
+  const usersQuery = useQuery({
+    queryKey: ["attendancePolicy", "users"],
+    queryFn: fetchUsers,
+    staleTime: 5 * 60 * 1000,
+  });
+  const employeesQuery = useQuery({
+    queryKey: ["attendancePolicy", "employees"],
+    queryFn: getEmployees,
+    staleTime: 5 * 60 * 1000,
+  });
+  const createAttendancePolicyMutation = useCreateAttendancePolicy();
+  const updateAttendancePolicyMutation = useUpdateAttendancePolicy();
+  const deleteAttendancePolicyMutation = useDeleteAttendancePolicy();
 
-  const loadAll = async () => {
-    setLoading(true);
-    try {
-      const [policyData, historyData, usersData, employeesData] = await Promise.all([
-        fetchAttendancePolicy(),
-        fetchAttendancePolicyHistory(),
-        fetchUsers().catch((error) => {
-          console.error("❌ Failed to load users for attendance policy names:", error);
-          return [];
-        }),
-        getEmployees().catch((error) => {
-          console.error("❌ Failed to load employees for attendance policy names:", error);
-          return [];
-        }),
-      ]);
-      const identityNameMap = new Map([
-        ...buildUserNameMap(toArray(usersData)).entries(),
-        ...buildEmployeeNameMap(toArray(employeesData)).entries(),
-      ]);
-      const liveRows = getPolicyRecords(policyData)
-        .filter(hasPolicyValues)
-        .reverse()
-        .map((item) => normalizeHistoryRow(item, identityNameMap))
-        .filter(Boolean);
-      const currentPolicy = normalizePolicy(
-        getPolicyRecord(policyData),
-        identityNameMap
-      );
-      const normalizedHistory = (Array.isArray(historyData) ? historyData : [])
-        .map((item) => normalizeHistoryRow(item, identityNameMap))
-        .filter(Boolean);
-      const mergedHistory = liveRows.length > 0 ? liveRows : normalizedHistory;
-
-      console.log("✅ Policy:", policyData);
-      console.log("✅ History:", historyData);
-      setPolicy(currentPolicy);
-      setHistory(mergedHistory);
-    } catch (err) {
-      console.error("❌ Failed to load attendance policy:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const identityNameMap = new Map([
+    ...buildUserNameMap(toArray(usersQuery.data)).entries(),
+    ...buildEmployeeNameMap(toArray(employeesQuery.data)).entries(),
+  ]);
+  const policy = normalizePolicy(getPolicyRecord(policyQuery.data), identityNameMap);
+  const liveHistoryRows = getPolicyRecords(policyQuery.data)
+    .filter(hasPolicyValues)
+    .reverse()
+    .map((item) => normalizeHistoryRow(item, identityNameMap))
+    .filter(Boolean);
+  const apiHistoryRows = toArray(historyQuery.data)
+    .map((item) => normalizeHistoryRow(item, identityNameMap))
+    .filter(Boolean);
+  const history = liveHistoryRows.length > 0 ? liveHistoryRows : apiHistoryRows;
+  const loading =
+    policyQuery.isLoading ||
+    historyQuery.isLoading ||
+    usersQuery.isLoading ||
+    employeesQuery.isLoading;
+  const submitting =
+    createAttendancePolicyMutation.isPending ||
+    updateAttendancePolicyMutation.isPending ||
+    deleteAttendancePolicyMutation.isPending;
+  const pageError = apiError || (policyQuery.isError || historyQuery.isError
+    ? "Failed to load attendance policy data. Please try again."
+    : "");
 
   // ── Add / edit submit handler ─────────────────
   const handleFormSubmit = async (formData) => {
-    setSubmitting(true);
     setApiError("");
+    const parsed = attendancePolicySchema.safeParse(formData);
+
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid attendance policy.");
+      return;
+    }
+
     try {
       if (editTarget) {
         const attPolicyId = editTarget.id || policy?.id;
@@ -498,12 +481,13 @@ export default function AttendancePolicy() {
           throw new Error("Attendance policy ID is required for update.");
         }
 
-        await updateAttendancePolicy(attPolicyId, formData);
+        await updateAttendancePolicyMutation.mutateAsync({
+          id: attPolicyId,
+          data: parsed.data,
+        });
       } else {
-        await createAttendancePolicy(formData);
+        await createAttendancePolicyMutation.mutateAsync(parsed.data);
       }
-      await loadAll();
-      console.log(editTarget ? "✅ Policy updated" : "✅ Policy created");
       setShowForm(false);
       setEditTarget(null);
     } catch (err) {
@@ -513,17 +497,13 @@ export default function AttendancePolicy() {
         err.response?.data?.error   ||
         "Failed to save policy. Please try again.";
       setApiError(msg);
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const handleDeleteRow = async (rowId) => {
-    setSubmitting(true);
     setApiError("");
     try {
-      await deleteAttendancePolicy(rowId);
-      await loadAll();
+      await deleteAttendancePolicyMutation.mutateAsync(rowId);
     } catch (err) {
       console.error("❌ Delete error:", err);
       const msg =
@@ -531,8 +511,6 @@ export default function AttendancePolicy() {
         err.response?.data?.error ||
         "Failed to delete policy. Please try again.";
       setApiError(msg);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -615,6 +593,12 @@ export default function AttendancePolicy() {
             </button>
           )}
         </div>
+
+        {pageError && !showForm && (
+          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {pageError}
+          </div>
+        )}
 
         {/* ── Current Policy section ── */}
         <div>

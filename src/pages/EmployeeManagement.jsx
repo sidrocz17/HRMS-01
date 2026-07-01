@@ -1,49 +1,73 @@
 // src/pages/EmployeeManagement.jsx
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import EmployeeTable from "../components/employeeManagement/EmployeeTable";
 import DeactivateModal from "../components/employeeManagement/DeactivateModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
 import { getRoleFromToken } from "../utils/auth.js";
-import useEmployee from "../hooks/useEmployee";
-import {
-  deactivateEmployee,
-  updateEmployeeStatus,
-} from "../api/employeeManagementApi";
+import { useDeleteEmployee, useEmployees } from "../hooks/query/useEmployees";
+import useEmployeeStore from "../store/useEmployeeStore";
+import { getApiErrorMessage } from "../utils/leaveTransformers";
 
 export default function EmployeeManagement() {
   const navigate = useNavigate();
   const {
-    employees,
-    setEmployees,
-    loading: employeeLoading,
+    data: queriedEmployees = [],
+    isLoading: employeeLoading,
+    isError: isEmployeeError,
     error: employeeError,
-  } = useEmployee();
+  } = useEmployees();
 
-  // State
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("active");
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const employees = useEmployeeStore((state) => state.employees);
+  const searchTerm = useEmployeeStore((state) => state.search);
+  const filters = useEmployeeStore((state) => state.filters);
+  const selectedEmployee = useEmployeeStore((state) => state.selectedEmployee);
+  const showDeactivateModal = useEmployeeStore(
+    (state) => state.isDeactivateModalOpen
+  );
+  const setEmployees = useEmployeeStore((state) => state.setEmployees);
+  const setSearchTerm = useEmployeeStore((state) => state.setSearch);
+  const setFilters = useEmployeeStore((state) => state.setFilters);
+  const openDeactivateModal = useEmployeeStore(
+    (state) => state.openDeactivateModal
+  );
+  const closeDeactivateModal = useEmployeeStore(
+    (state) => state.closeDeactivateModal
+  );
 
   const currentUserRole = normalizeRole(getRoleFromToken());
+  const deleteEmployeeMutation = useDeleteEmployee({
+    onSuccess: () => {
+      console.log("✅ Employee status updated");
+      closeDeactivateModal();
+    },
+    onError: ({ message }) => setError(message),
+  });
+
+  useEffect(() => {
+    setEmployees(queriedEmployees);
+  }, [queriedEmployees, setEmployees]);
 
   // Filtered employees based on search and status
-  const filteredEmployees = employees.filter((emp) => {
-    const matchesSearch =
-      emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredEmployees = useMemo(() => {
+    const normalizedSearch = String(searchTerm || "").toLowerCase();
+    const statusFilter = filters.status;
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && emp.is_active) ||
-      (statusFilter === "inactive" && !emp.is_active);
+    return employees.filter((emp) => {
+      const matchesSearch =
+        String(emp.first_name || "").toLowerCase().includes(normalizedSearch) ||
+        String(emp.last_name || "").toLowerCase().includes(normalizedSearch) ||
+        String(emp.email || "").toLowerCase().includes(normalizedSearch);
 
-    return matchesSearch && matchesStatus;
-  });
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && emp.is_active) ||
+        (statusFilter === "inactive" && !emp.is_active);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [employees, filters.status, searchTerm]);
 
   const handleEdit = (employee) => {
     console.log("✏️ Edit employee:", employee);
@@ -53,47 +77,23 @@ export default function EmployeeManagement() {
   };
 
   const handleDeactivate = (employee) => {
-    setSelectedEmployee(employee);
-    setShowDeactivateModal(true);
+    setError("");
+    openDeactivateModal(employee);
   };
 
   const handleDeactivateConfirm = async (deactivateData) => {
     if (!selectedEmployee) return;
 
-    setLoading(true);
     setError("");
 
     try {
-      if (!deactivateData.employeeActive) {
-        await deactivateEmployee(selectedEmployee.empId);
-      } else {
-        await updateEmployeeStatus(selectedEmployee.empId, deactivateData);
-      }
-
-      setEmployees((prev) =>
-        prev.map((emp) =>
-          emp.empId === selectedEmployee.empId
-            ? {
-                ...emp,
-                is_active: deactivateData.employeeActive,
-                user_active: deactivateData.userActive,
-              }
-            : emp
-        )
-      );
-
-      console.log("✅ Employee deactivated:", deactivateData);
-      setShowDeactivateModal(false);
-      setSelectedEmployee(null);
+      await deleteEmployeeMutation.mutateAsync({
+        empId: selectedEmployee.empId,
+        statusData: deactivateData.employeeActive ? deactivateData : null,
+      });
     } catch (err) {
       console.error("❌ Error deactivating employee:", err);
-      const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to update employee status";
-      setError(message);
-    } finally {
-      setLoading(false);
+      setError(getApiErrorMessage(err, "Failed to update employee status"));
     }
   };
 
@@ -111,7 +111,7 @@ export default function EmployeeManagement() {
       </div>
 
       {/* Error Message */}
-      {(error || employeeError) && (
+      {(error || isEmployeeError) && (
         <div className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
           <svg
             className="w-5 h-5 flex-shrink-0"
@@ -124,7 +124,7 @@ export default function EmployeeManagement() {
               clipRule="evenodd"
             />
           </svg>
-          {error || employeeError}
+          {error || getApiErrorMessage(employeeError, "Failed to load employees")}
         </div>
       )}
 
@@ -167,8 +167,8 @@ export default function EmployeeManagement() {
                 Status
               </label>
               <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                value={filters.status}
+                onChange={(e) => setFilters({ status: e.target.value })}
                 className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10 transition-all"
               >
                 <option value="all">All Employees</option>
@@ -256,11 +256,8 @@ export default function EmployeeManagement() {
         <DeactivateModal
           employee={selectedEmployee}
           onConfirm={handleDeactivateConfirm}
-          onCancel={() => {
-            setShowDeactivateModal(false);
-            setSelectedEmployee(null);
-          }}
-          loading={loading}
+          onCancel={closeDeactivateModal}
+          loading={deleteEmployeeMutation.isPending}
         />
       )}
     </div>

@@ -6,16 +6,19 @@
 //    HR/ADMIN  → Punch In/Out + view all records
 // ─────────────────────────────────────────────
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import ThoughtCard from "../components/attendancePage/ThoughtCard";
 import AttendanceCard from "../components/attendancePage/AttendanceCard";
 import AttendanceTable from "../components/attendancePage/AttendanceTable";
+import { useAttendance } from "../hooks/queries/useAttendance";
 import {
-  punchIn,
-  punchOut,
-  getAttendance,
-} from "../api/attendanceApi";
-import { getRoleFromToken } from "../utils/auth.js";
+  usePunchIn,
+  usePunchOut,
+} from "../hooks/mutations/useAttendancePunch";
+import { attendancePunchSchema } from "../schemas/attendanceSchema";
+import useAttendanceStore from "../store/useAttendanceStore";
+import { getApiErrorMessage } from "../utils/leaveTransformers";
+import { getUserFromToken } from "../utils/auth.js";
 
 // ── Status constants ──────────────────────────
 const STATUS = {
@@ -143,125 +146,104 @@ function Toast({ message, type, onDone }) {
 // ─────────────────────────────────────────────
 export default function Attendance() {
   // ── RBAC ──────────────────────────────────────
-  const role = getRoleFromToken();
+  const { role, empId: loggedInEmployeeId } = getUserFromToken();
   const isAdminOrHR = role === "admin" || role === "hr";
   const isEmployee = role === "employee";
+  const hasEmployeeId = Boolean(String(loggedInEmployeeId || "").trim());
 
-  // ── State ──────────────────────────────────────
-  const [status, setStatus] = useState(STATUS.NOT_STARTED);
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
-  const [todayRecord, setTodayRecord] = useState(null); // { inISO, outISO }
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  // ── Client/UI state ────────────────────────────
   const [toast, setToast] = useState(null); // { message, type }
+  const selectedDate = useAttendanceStore((state) => state.selectedDate);
+  const filters = useAttendanceStore((state) => state.filters);
+  const setSelectedDate = useAttendanceStore((state) => state.setSelectedDate);
+  const setFilters = useAttendanceStore((state) => state.setFilters);
+  const resetFilters = useAttendanceStore((state) => state.resetFilters);
+
+  const {
+    data: attendanceRecords = [],
+    isLoading,
+    isFetching,
+    isError,
+    error,
+  } = useAttendance({
+    date: isAdminOrHR ? selectedDate : undefined,
+    isAdminOrHR,
+    enabled: hasEmployeeId,
+  });
+
+  const todayState = useMemo(
+    () => deriveTodayState(attendanceRecords),
+    [attendanceRecords]
+  );
+
+  const filteredRecords = useMemo(() => {
+    const search = String(filters.search || "").trim().toLowerCase();
+    const statusFilter = String(filters.status || "").trim().toUpperCase();
+
+    return attendanceRecords.filter((record) => {
+      const matchesDate =
+        !isAdminOrHR || !selectedDate || record.dateISO === selectedDate;
+      const matchesStatus =
+        !statusFilter || String(record.status || "").toUpperCase() === statusFilter;
+      const matchesSearch =
+        !search ||
+        [record.employeeName, record.employeeId, record.remarks]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(search));
+
+      return matchesDate && matchesStatus && matchesSearch;
+    });
+  }, [attendanceRecords, filters.search, filters.status, isAdminOrHR, selectedDate]);
 
   // ── Helpers ───────────────────────────────────
   const showToast = (message, type = "success") => setToast({ message, type });
   const clearToast = useCallback(() => setToast(null), []);
 
-  // ── Load history on mount ─────────────────────
-  useEffect(() => {
-    loadHistory();
-  }, []);
+  const buildPunchPayload = (punchType) =>
+    attendancePunchSchema.parse({
+      employeeId: loggedInEmployeeId,
+      date: getTodayKey(),
+      punchType,
+      remarks: "",
+    });
 
-  const loadHistory = async () => {
-    setLoading(true);
-    try {
-      const data = await getAttendance();
-      const nextHistory = data || [];
-      setHistory(nextHistory);
+  const punchInMutation = usePunchIn({
+    onSuccess: ({ message }) => showToast(message, "success"),
+    onError: ({ message }) => showToast(message, "error"),
+  });
 
-      const {
-        status: derivedStatus,
-        hasCheckedInToday: derivedHasCheckedInToday,
-        todayRecord: derivedRecord,
-      } =
-        deriveTodayState(nextHistory);
-      setStatus(derivedStatus);
-      setHasCheckedInToday(derivedHasCheckedInToday);
-      setTodayRecord(derivedRecord);
-    } catch (err) {
-      console.error("❌ Failed to load attendance:", err);
-      showToast(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          err.message ||
-          "Failed to load attendance.",
-        "error"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const punchOutMutation = usePunchOut({
+    onSuccess: ({ message }) => showToast(message, "success"),
+    onError: ({ message }) => showToast(message, "error"),
+  });
+
+  const submitting = punchInMutation.isPending || punchOutMutation.isPending;
+  const pageError =
+    !hasEmployeeId
+      ? "Employee ID missing. Please log out and log in again."
+      : isError
+      ? getApiErrorMessage(error, "Failed to load attendance.")
+      : "";
 
   // ── Punch In ──────────────────────────────────
   const handlePunchIn = async () => {
-    setSubmitting(true);
     try {
-      const result = await punchIn();
-      const nextRecord = {
-        inISO: result.inISO || result.outISO || null,
-        outISO: result.outISO || null,
-      };
-
-      if (nextRecord.inISO && nextRecord.outISO) {
-        setTodayRecord(nextRecord);
-        setStatus(STATUS.WORKING);
-        setHasCheckedInToday(true);
-        showToast("Punched Out successfully! See you tomorrow.", "success");
-      } else {
-        setTodayRecord(nextRecord);
-        setStatus(STATUS.WORKING);
-        setHasCheckedInToday(true);
-        showToast("Punched In successfully! Have a great day.", "success");
-      }
-
-      await loadHistory();
+      await punchInMutation.mutateAsync(buildPunchPayload("IN"));
     } catch (err) {
-      console.error("❌ Punch In failed:", err);
-      const message =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Failed to Punch In. Please try again.";
-      showToast(message, "error");
-    } finally {
-      setSubmitting(false);
+      if (err?.issues) {
+        showToast(err.issues[0]?.message || "Invalid punch request.", "error");
+      }
     }
   };
 
   // ── Punch Out ────────────────────────────────
   const handlePunchOut = async () => {
-    setSubmitting(true);
     try {
-      const result = await punchOut();
-      const nextRecord = {
-        inISO: result.inISO || todayRecord?.inISO || null,
-        outISO: result.outISO || null,
-      };
-
-      if (nextRecord.outISO) {
-        setTodayRecord(nextRecord);
-        setStatus(STATUS.WORKING);
-        setHasCheckedInToday(true);
-        showToast("Punched Out successfully! See you tomorrow.", "success");
-      } else if (nextRecord.inISO) {
-        setTodayRecord(nextRecord);
-        setStatus(STATUS.WORKING);
-        setHasCheckedInToday(true);
-        showToast("Punched In successfully! Have a great day.", "success");
-      }
-
-      await loadHistory(); // refresh table
+      await punchOutMutation.mutateAsync(buildPunchPayload("OUT"));
     } catch (err) {
-      console.error("❌ Punch Out failed:", err);
-      const message =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Failed to Punch Out. Please try again.";
-      showToast(message, "error");
-    } finally {
-      setSubmitting(false);
+      if (err?.issues) {
+        showToast(err.issues[0]?.message || "Invalid punch request.", "error");
+      }
     }
   };
 
@@ -292,10 +274,10 @@ export default function Attendance() {
       {(isEmployee || isAdminOrHR) && (
         <div className="mb-6">
           <AttendanceCard
-            status={status}
-            canPunchIn={!hasCheckedInToday}
-            canPunchOut={hasCheckedInToday}
-            todayRecord={todayRecord}
+            status={todayState.status}
+            canPunchIn={hasEmployeeId && !todayState.hasCheckedInToday}
+            canPunchOut={hasEmployeeId && todayState.status === STATUS.WORKING}
+            todayRecord={todayState.todayRecord}
             onPunchIn={handlePunchIn}
             onPunchOut={handlePunchOut}
             submitting={submitting}
@@ -303,11 +285,92 @@ export default function Attendance() {
         </div>
       )}
 
+      {pageError && (
+        <div className="mb-6 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+          <svg
+            className="w-5 h-5 flex-shrink-0"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {pageError}
+        </div>
+      )}
+
+      <div className="mb-4 bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-4">
+        <div className="flex flex-wrap items-end gap-4">
+          {isAdminOrHR && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Date
+              </span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
+              />
+            </label>
+          )}
+
+          {isAdminOrHR && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Search
+              </span>
+              <input
+                type="search"
+                value={filters.search}
+                onChange={(event) => setFilters({ search: event.target.value })}
+                placeholder="Employee or remarks"
+                className="h-10 w-64 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
+              />
+            </label>
+          )}
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Status
+            </span>
+            <select
+              value={filters.status}
+              onChange={(event) => setFilters({ status: event.target.value })}
+              className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 outline-none focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
+            >
+              <option value="">All</option>
+              <option value="PRESENT">Present</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LATE">Late</option>
+              <option value="HALF_DAY">Half Day</option>
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="h-10 px-4 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-95 transition-all"
+          >
+            Reset
+          </button>
+
+          {isFetching && !isLoading && (
+            <span className="pb-2 text-xs font-medium text-gray-400">
+              Refreshing...
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* ── Attendance History Table ── */}
       <AttendanceTable
-        records={history}
+        records={filteredRecords}
         isAdminOrHR={isAdminOrHR}
-        loading={loading}
+        loading={isLoading}
       />
 
       {/* ── Toast ── */}

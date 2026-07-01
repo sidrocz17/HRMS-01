@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { ROLE_REDIRECT, normalizeRole } from "../config/roles.jsx";
-import { buildUrl } from "../api/apiBase";
+import { loginSchema } from "../schemas/loginSchema";
+import useAuthStore from "../store/useAuthStore";
 import { getUserFromToken } from "../utils/auth.js";
 
 const NetworkIcon = () => (
@@ -47,11 +47,15 @@ export default function XcelTechSplitLogin() {
   const [password, setPassword]             = useState("");
   const [remember, setRemember]             = useState(false);
   const [showPassword, setShowPassword]     = useState(false);
-  const [loading, setLoading]               = useState(false);
+  const [fieldErrors, setFieldErrors]       = useState({});
   const [emailFocused, setEmailFocused]     = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const navigate = useNavigate();
+  const loading = useAuthStore((state) => state.loading);
+  const authError = useAuthStore((state) => state.error);
+  const login = useAuthStore((state) => state.login);
+  const clearAuthError = useAuthStore((state) => state.clearError);
 
   useEffect(() => {
     const { token, role } = getUserFromToken();
@@ -62,34 +66,23 @@ export default function XcelTechSplitLogin() {
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
-    const username = email.trim();
+    const result = loginSchema.safeParse({ email, password });
 
-    if (!username || !password) {
-      alert("Please enter both username and password.");
+    if (!result.success) {
+      const errors = result.error.flatten().fieldErrors;
+      setFieldErrors({
+        email: errors.email?.[0] || "",
+        password: errors.password?.[0] || "",
+      });
       return;
     }
 
-    setLoading(true);
+    setFieldErrors({});
+    clearAuthError();
+
     try {
-      const response = await axios.post(
-        buildUrl("/auth/login"),
-        { username, password },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const data = response.data;
+      const { data } = await login(result.data);
       console.log("Login response:", data);
-
-      const token = data.accessToken || data.token;
-      if (!token) {
-        throw new Error("Token missing in login response");
-      }
-      localStorage.setItem("token", token);
-      localStorage.removeItem("auth_token");
 
       const tokenUser = getUserFromToken();
       const userRole = normalizeRole(
@@ -100,27 +93,11 @@ export default function XcelTechSplitLogin() {
       navigate(redirectPath, { replace: true });
 
     } catch (error) {
-      const status = error.response?.status;
-      const errorData = error.response?.data;
-      const message =
-        errorData?.message ||
-        error.message ||
-        "Login failed ❌";
-
       console.error("Login error:", {
-        url: buildUrl("/auth/login"),
-        status,
-        data: errorData,
+        status: error.status,
+        data: error.data,
         message: error.message,
       });
-
-      if (status === 400) {
-        alert(`${message}\nAPI: ${buildUrl("/auth/login")}`);
-      } else {
-        alert(message);
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -183,12 +160,19 @@ export default function XcelTechSplitLogin() {
                 type="text"
                 placeholder="username"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setFieldErrors((errors) => ({ ...errors, email: "" }));
+                  clearAuthError();
+                }}
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
                 className="flex-1 ml-2.5 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
               />
             </div>
+            {fieldErrors.email && (
+              <p className="mt-1.5 text-xs text-red-500">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div className="mb-5">
@@ -204,7 +188,11 @@ export default function XcelTechSplitLogin() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setFieldErrors((errors) => ({ ...errors, password: "" }));
+                  clearAuthError();
+                }}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
                 className="flex-1 mx-2.5 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
@@ -213,6 +201,11 @@ export default function XcelTechSplitLogin() {
                 <EyeIcon open={showPassword} />
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="mt-1.5 text-xs text-red-500">
+                {fieldErrors.password}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between mb-6">
@@ -225,6 +218,10 @@ export default function XcelTechSplitLogin() {
               Reset Password?
             </button>
           </div>
+
+          {authError && (
+            <p className="mb-4 text-xs font-medium text-red-500">{authError}</p>
+          )}
 
           <button
             type="submit"

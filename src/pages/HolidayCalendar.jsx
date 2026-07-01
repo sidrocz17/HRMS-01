@@ -6,10 +6,16 @@
 // ─────────────────────────────────────────────
 
 import { useState, useMemo } from "react";
-import { useHolidays }   from "../components/holiday/useHolidays";
 import HolidayForm       from "../components/holiday/HolidayForm";
 import DeleteConfirm     from "../components/holiday/DeleteConfirm";
-import { HOLIDAY_TYPES, getYearOptions } from "../api/holidayApi";
+import { HOLIDAY_TYPES, getYearOptions, normalizeHolidayType } from "../api/holidayApi";
+import {
+  useCreateHolidayCalendar,
+  useDeleteHolidayCalendar,
+  useHolidayCalendar,
+  useUpdateHolidayCalendar,
+} from "../hooks/query/useHolidayCalendar";
+import { holidaySchema } from "../schemas/holidaySchema";
 import { getRoleFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 10;
@@ -47,12 +53,6 @@ const formatDate = (dateStr) => {
   });
 };
 
-// ── Month group label ─────────────────────────
-const getMonthLabel = (dateStr) => {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-};
-
 // ── Days until holiday ────────────────────────
 const getDaysUntil = (dateStr) => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -74,13 +74,12 @@ export default function HolidayCalendar() {
   const currentYear = new Date().getFullYear();
   const yearOptions = getYearOptions();
 
-  // ── Holiday hook ──────────────────────────────
-  const {
-    holidays, loading, submitting, apiError, setApiError,
-    selectedYear, setSelectedYear,
-    isDuplicateDate,
-    addHoliday, editHoliday, removeHoliday,
-  } = useHolidays(currentYear);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [apiError, setApiError] = useState("");
+  const holidaysQuery = useHolidayCalendar(selectedYear);
+  const createHolidayMutation = useCreateHolidayCalendar();
+  const updateHolidayMutation = useUpdateHolidayCalendar();
+  const deleteHolidayMutation = useDeleteHolidayCalendar();
 
   // ── Local UI state ────────────────────────────
   const [search, setSearch]             = useState("");
@@ -90,6 +89,29 @@ export default function HolidayCalendar() {
   const [formMode, setFormMode]         = useState("add");
   const [editTarget, setEditTarget]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const holidays = useMemo(() => {
+    const mapped = (Array.isArray(holidaysQuery.data) ? holidaysQuery.data : []).map((h) => ({
+      id:           h.holidayId   || h.id           || h.holiday_id,
+      holidayName:  h.holidayName || h.holiday_name || h.name,
+      holidayDate:  h.holidayDate || h.holiday_date || h.date,
+      holidayType:  normalizeHolidayType(h.holidayType || h.holiday_type || h.type),
+      calendarYear: h.calendarYear || h.calendar_year || selectedYear,
+    }));
+
+    return mapped.sort((a, b) => new Date(a.holidayDate) - new Date(b.holidayDate));
+  }, [holidaysQuery.data, selectedYear]);
+  const loading = holidaysQuery.isLoading;
+  const submitting =
+    createHolidayMutation.isPending ||
+    updateHolidayMutation.isPending ||
+    deleteHolidayMutation.isPending;
+  const pageError = apiError || (holidaysQuery.isError
+    ? "Failed to load holidays. Please try again."
+    : "");
+
+  const isDuplicateDate = (date, excludeId = null) =>
+    holidays.some((h) => h.holidayDate === date && h.id !== excludeId);
 
   // ── Filtered list ─────────────────────────────
   const filtered = useMemo(() =>
@@ -134,19 +156,45 @@ export default function HolidayCalendar() {
   };
 
   const handleFormSubmit = async (formData) => {
-    const success = formMode === "add"
-      ? await addHoliday(formData)
-      : await editHoliday(editTarget.id, formData);
-    if (success) {
+    setApiError("");
+    const parsed = holidaySchema.safeParse(formData);
+
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid holiday details.");
+      return;
+    }
+
+    try {
+      if (formMode === "add") {
+        await createHolidayMutation.mutateAsync(parsed.data);
+      } else {
+        await updateHolidayMutation.mutateAsync({
+          id: editTarget.id,
+          data: parsed.data,
+        });
+      }
       setShowForm(false);
       setCurrentPage(1);
+    } catch (err) {
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to save holiday. Please try again.";
+      setApiError(msg);
     }
   };
 
   const handleDeleteConfirm = async () => {
-    const success = await removeHoliday(deleteTarget.id);
-    if (success) {
+    setApiError("");
+    try {
+      await deleteHolidayMutation.mutateAsync(deleteTarget.id);
       setDeleteTarget(null);
+    } catch (err) {
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Failed to delete holiday. Please try again.";
+      setApiError(msg);
     }
   };
 
@@ -198,6 +246,12 @@ export default function HolidayCalendar() {
           )}
         </div>
       </div>
+
+      {pageError && !showForm && !deleteTarget && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      )}
 
       {/* ── Summary Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

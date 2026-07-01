@@ -1,14 +1,11 @@
 // src/pages/EmployeeOnboarding.jsx
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { createEmployee } from "../api/employeeApi";
-import { getEmployeeById, updateEmployee } from "../api/employeeManagementApi";
 import { fetchDepartments } from "../api/departmentApi";
 import { getMappedDesignations } from "../api/deptDesigApi";
 import { fetchDesignations } from "../api/designationApi";
 import { fetchEmployeeTypes } from "../api/employeeTypeApi";
 import { allocateEmployeeLeaves } from "../api/leaveApi";
-import { fetchLeaveTypes as fetchLeaveTypesForAssign } from "../api/leaveTypeApi";
 import Stepper from "../components/employee_OB/onboarding/Stepper";
 import BasicInfoStep from "../components/employee_OB/onboarding/BasicInfoStep";
 import JobDetailsStep from "../components/employee_OB/onboarding/JobDetailsStep";
@@ -18,6 +15,16 @@ import SuccessModal from "../components/modals/SuccessModal";
 import AssignLeaveModal from "../components/modals/AssignLeaveModal";
 import { normalizeRole, ROLES } from "../config/roles.jsx";
 import { getUserFromToken } from "../utils/auth.js";
+import {
+  employeeOnboardingSchema,
+  employeeOnboardingStepSchemas,
+} from "../schemas/employeeSchema";
+import {
+  useGetOnboarding,
+  useSubmitOnboarding,
+  useUpdateOnboarding,
+} from "../hooks/queries/useEmployeeOnboarding";
+import { getApiErrorMessage } from "../utils/leaveTransformers";
 
 const STEPS = [
   { number: 1, label: "Basic Info" },
@@ -327,7 +334,6 @@ export default function EmployeeOnboarding() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [stepErrors, setStepErrors] = useState({});
-  const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
   const [departments, setDepartments] = useState([]);
   const [allDesignations, setAllDesignations] = useState([]);
@@ -340,7 +346,7 @@ export default function EmployeeOnboarding() {
   const [leaveAllocationMessage, setLeaveAllocationMessage] = useState("");
   const [leaveAllocationError, setLeaveAllocationError] = useState("");
   const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
-  const [assignLeaveTypes, setAssignLeaveTypes] = useState([]);
+  const [assignLeaveTypes] = useState([]);
   const [assignLeaveTypesLoading, setAssignLeaveTypesLoading] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
@@ -350,6 +356,18 @@ export default function EmployeeOnboarding() {
   const mode = searchParams.get("mode");
   const employeeId = searchParams.get("id");
   const isEditMode = mode === "edit";
+  const routeEmployee = location.state?.employee;
+  const {
+    data: onboardingEmployee,
+    isError: isOnboardingEmployeeError,
+    error: onboardingEmployeeError,
+  } = useGetOnboarding(employeeId, {
+    enabled: isEditMode && Boolean(employeeId) && !routeEmployee,
+  });
+  const submitOnboardingMutation = useSubmitOnboarding();
+  const updateOnboardingMutation = useUpdateOnboarding();
+  const loading =
+    submitOnboardingMutation.isPending || updateOnboardingMutation.isPending;
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -478,41 +496,30 @@ export default function EmployeeOnboarding() {
   }, [allDesignations, formData.jobDetails.dept_id, formData.jobDetails.desig_id]);
 
   useEffect(() => {
-    const routeEmployee = location.state?.employee;
+    if (!isEditMode) {
+      setFormData(INITIAL_FORM_DATA);
+      return;
+    }
 
-    const hydrateEditData = async () => {
-      if (!isEditMode) {
-        setFormData(INITIAL_FORM_DATA);
-        return;
-      }
+    if (routeEmployee) {
+      setFormData(mapEmployeeToFormData(routeEmployee));
+    }
+  }, [isEditMode, routeEmployee]);
 
-      try {
-        if (routeEmployee) {
-          const mappedRouteEmployee = mapEmployeeToFormData(routeEmployee);
-          setFormData(mappedRouteEmployee);
+  useEffect(() => {
+    if (!isEditMode || routeEmployee || !onboardingEmployee) return;
 
-          if (mappedRouteEmployee.jobDetails.employee_type_id) {
-            return;
-          }
-        }
+    const employeeData = onboardingEmployee?.data || onboardingEmployee || {};
+    setFormData(mapEmployeeToFormData(employeeData));
+  }, [isEditMode, onboardingEmployee, routeEmployee]);
 
-        if (employeeId) {
-          const response = await getEmployeeById(employeeId);
-          const employeeData = response?.data || response || {};
-          setFormData(mapEmployeeToFormData(employeeData));
-        }
-      } catch (error) {
-        console.error("❌ Failed to load employee for edit:", error);
-        setApiError(
-          error?.response?.data?.message ||
-            error?.message ||
-            "Failed to load employee details",
-        );
-      }
-    };
+  useEffect(() => {
+    if (!isOnboardingEmployeeError) return;
 
-    hydrateEditData();
-  }, [isEditMode, employeeId, location.state]);
+    setApiError(
+      getApiErrorMessage(onboardingEmployeeError, "Failed to load employee details")
+    );
+  }, [isOnboardingEmployeeError, onboardingEmployeeError]);
 
   useEffect(() => {
     if (!employeeTypes.length) return;
@@ -545,6 +552,12 @@ export default function EmployeeOnboarding() {
         [field]: value,
       },
     }));
+    setStepErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
   };
 
   const handleSuccessModalClose = () => {
@@ -558,37 +571,6 @@ export default function EmployeeOnboarding() {
     setFormData(INITIAL_FORM_DATA);
     setStep(1);
     navigate("/employee-management");
-  };
-
-  const ensureAssignLeaveTypesLoaded = async () => {
-    if (assignLeaveTypesLoading) return { types: null, error: null };
-    if (assignLeaveTypes.length > 0)
-      return { types: assignLeaveTypes, error: null };
-
-    setAssignLeaveTypesLoading(true);
-    try {
-      const response = await fetchLeaveTypesForAssign();
-      const rawTypes = Array.isArray(response?.data) ? response.data : response;
-      const normalized = (Array.isArray(rawTypes) ? rawTypes : [])
-        .map((t) => ({
-          id: t.typeId ?? t.id ?? t.type_id,
-          name: t.type ?? t.leaveType ?? t.name ?? t.label ?? "",
-        }))
-        .filter((t) => t.id && t.name);
-
-      setAssignLeaveTypes(normalized);
-      return { types: normalized, error: null };
-    } catch (error) {
-      console.error("❌ Failed to load leave types:", error);
-      const message =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
-        error?.message ||
-        "Failed to load leave types";
-      return { types: null, error: message };
-    } finally {
-      setAssignLeaveTypesLoading(false);
-    }
   };
 
   const handleAddLeaveClick = async () => {
@@ -673,62 +655,29 @@ export default function EmployeeOnboarding() {
     }
   };
 
+  const zodIssuesToFieldErrors = (issues = []) =>
+    issues.reduce((acc, issue) => {
+      const field = issue.path[issue.path.length - 1];
+      if (field && !acc[field]) acc[field] = issue.message;
+      return acc;
+    }, {});
+
+  const getStepValidationData = (stepNum) => {
+    if (stepNum === 1) return formData.basicInfo;
+    if (stepNum === 2) return formData.jobDetails;
+    if (stepNum === 3) return formData.identity;
+    return formData;
+  };
+
   const validateStep = (stepNum) => {
-    const errors = {};
+    const schema = employeeOnboardingStepSchemas[stepNum];
+    if (!schema) return true;
 
-    switch (stepNum) {
-      case 1: // Basic Info
-        if (!formData.basicInfo.first_name.trim())
-          errors.first_name = "First name required";
-        if (!formData.basicInfo.last_name.trim())
-          errors.last_name = "Last name required";
-        if (!formData.basicInfo.email.trim()) errors.email = "Email required";
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.basicInfo.email))
-          errors.email = "Invalid email";
-        if (!formData.basicInfo.phone.trim()) errors.phone = "Phone required";
-        else if (!/^\d{10}$/.test(formData.basicInfo.phone.replace(/\D/g, "")))
-          errors.phone = "Invalid phone (10 digits)";
-        if (!formData.basicInfo.address.trim())
-          errors.address = "Address required";
-        if (!formData.basicInfo.date_of_birth)
-          errors.date_of_birth = "Date of birth required";
-        break;
-
-      case 2: // Job Details
-        if (!formData.jobDetails.dept_id)
-          errors.dept_id = "Department required";
-        if (!formData.jobDetails.desig_id)
-          errors.desig_id = "Designation required";
-        if (!formData.jobDetails.employee_type_id)
-          errors.employee_type_id = "Employee type required";
-        if (!formData.jobDetails.role) errors.role = "Role required";
-        if (!formData.jobDetails.join_date)
-          errors.join_date = "Joining date required";
-        if (!formData.jobDetails.notice_period)
-          errors.notice_period = "Notice period required";
-        break;
-
-      case 3: // Identity
-        if (!formData.identity.pan_num.trim())
-          errors.pan_num = "PAN number required";
-        else if (formData.identity.pan_num.length !== 10)
-          errors.pan_num = "PAN must be 10 characters";
-
-        if (!formData.identity.aadhar_num.trim())
-          errors.aadhar_num = "Aadhaar number required";
-        else if (formData.identity.aadhar_num.replace(/\D/g, "").length !== 12)
-          errors.aadhar_num = "Aadhaar must be 12 digits";
-        break;
-
-      case 4: // Review (no validation needed)
-        break;
-
-      default:
-        break;
-    }
+    const result = schema.safeParse(getStepValidationData(stepNum));
+    const errors = result.success ? {} : zodIssuesToFieldErrors(result.error.issues);
 
     setStepErrors(errors);
-    return Object.keys(errors).length === 0;
+    return result.success;
   };
 
   const handleNext = () => {
@@ -744,9 +693,21 @@ export default function EmployeeOnboarding() {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(step)) return;
+    const validation = employeeOnboardingSchema.safeParse(formData);
 
-    setLoading(true);
+    if (!validation.success) {
+      const firstSection = validation.error.issues[0]?.path?.[0];
+      const sectionStep = {
+        basicInfo: 1,
+        jobDetails: 2,
+        identity: 3,
+      }[firstSection];
+
+      if (sectionStep) setStep(sectionStep);
+      setStepErrors(zodIssuesToFieldErrors(validation.error.issues));
+      return;
+    }
+
     setApiError("");
 
     try {
@@ -754,8 +715,8 @@ export default function EmployeeOnboarding() {
       const payload = transformPayload(formData, userId);
       const response =
         isEditMode && employeeId
-          ? await updateEmployee(employeeId, payload)
-          : await createEmployee(payload);
+          ? await updateOnboardingMutation.mutateAsync({ employeeId, payload })
+          : await submitOnboardingMutation.mutateAsync({ payload });
       const responseSources = getResponseSources(response);
       const employeeMessage = firstFilledValue(
         ...responseSources.map((item) => item.message),
@@ -829,14 +790,7 @@ export default function EmployeeOnboarding() {
       setShowSuccessModal(true);
     } catch (error) {
       console.error("❌ Error:", error);
-      setApiError(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          error.message ||
-          "Failed to create employee",
-      );
-    } finally {
-      setLoading(false);
+      setApiError(getApiErrorMessage(error, "Failed to create employee"));
     }
   };
 

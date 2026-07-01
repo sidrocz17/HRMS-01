@@ -5,15 +5,17 @@
 //  UI matches Designation page exactly
 // ─────────────────────────────────────────────
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import StatusBadge   from "../components/employee/StatusBadge";
 import LeaveTypeForm from "../components/leavetype/LeaveTypeForm";
 import DeleteConfirm from "../components/leavetype/DeleteConfirm";
 import {
-  createLeaveType,
-  deleteLeaveType,
-  fetchLeaveTypes,
-} from "../api/leaveTypeApi";
+  useCreateLeaveType,
+  useDeleteLeaveType,
+  useLeaveTypes,
+  useUpdateLeaveType,
+} from "../hooks/query/useLeaveTypes";
+import { leaveTypeSchema } from "../schemas/leaveTypeSchema";
 import { getRoleFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 8;
@@ -82,7 +84,6 @@ export default function LeaveTypes() {
   const role = getRoleFromToken();
 
   // ── Data state ────────────────────────────────
-  const [leaveTypes, setLeaveTypes]   = useState([]);
   const [search, setSearch]           = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,32 +95,29 @@ export default function LeaveTypes() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── API state ─────────────────────────────────
-  const [loading, setLoading]       = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
+  const [localUpdates, setLocalUpdates] = useState({});
+  const [deletedIds, setDeletedIds] = useState([]);
 
-  // ── Load on mount ─────────────────────────────
-  useEffect(() => {
-    if (role === "admin") loadLeaveTypes();
-  }, []);
+  const leaveTypesQuery = useLeaveTypes({ enabled: role === "admin" });
+  const createLeaveTypeMutation = useCreateLeaveType();
+  const updateLeaveTypeMutation = useUpdateLeaveType();
+  const deleteLeaveTypeMutation = useDeleteLeaveType();
 
-  const loadLeaveTypes = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchLeaveTypes();
-      console.log("✅ Leave types fetched:", data);
-
-      // Map API fields → local fields
-      const mapped = data.map(mapLeaveType);
-
-      setLeaveTypes(mapped);
-    } catch (error) {
-      console.error("❌ Failed to fetch leave types:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const leaveTypes = useMemo(
+    () => (Array.isArray(leaveTypesQuery.data) ? leaveTypesQuery.data : [])
+      .map(mapLeaveType)
+      .map((item) => ({ ...item, ...(localUpdates[item.id] || {}) }))
+      .filter((item) => !deletedIds.includes(item.id)),
+    [leaveTypesQuery.data, localUpdates, deletedIds],
+  );
+  const loading = leaveTypesQuery.isLoading;
+  const submitting =
+    createLeaveTypeMutation.isPending || updateLeaveTypeMutation.isPending;
+  const deleteSubmitting = deleteLeaveTypeMutation.isPending;
+  const pageError = apiError || (leaveTypesQuery.isError
+    ? "Failed to load leave types. Please try again."
+    : "");
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
@@ -161,19 +159,26 @@ export default function LeaveTypes() {
   };
 
   const handleFormSubmit = async (formData) => {
-    setSubmitting(true);
     setApiError("");
+    const parsed = leaveTypeSchema.safeParse(formData);
+
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid leave type details.");
+      return;
+    }
 
     try {
       if (formMode === "add") {
-        const response = await createLeaveType(formData);
-        console.log("✅ Leave type created:", response);
-        await loadLeaveTypes();
+        await createLeaveTypeMutation.mutateAsync(parsed.data);
       } else {
-        // Edit — local update until PUT API ready
-        setLeaveTypes((prev) =>
-          prev.map((d) => d.id === editTarget.id ? { ...d, ...formData } : d)
-        );
+        await updateLeaveTypeMutation.mutateAsync({
+          id: editTarget.id,
+          data: parsed.data,
+        });
+        setLocalUpdates((prev) => ({
+          ...prev,
+          [editTarget.id]: parsed.data,
+        }));
       }
 
       setShowForm(false);
@@ -187,8 +192,6 @@ export default function LeaveTypes() {
         "Something went wrong. Please try again.";
       setApiError(message);
 
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -200,12 +203,11 @@ export default function LeaveTypes() {
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
 
-    setDeleteSubmitting(true);
     setApiError("");
 
     try {
-      await deleteLeaveType(deleteTarget.id);
-      setLeaveTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      await deleteLeaveTypeMutation.mutateAsync(deleteTarget.id);
+      setDeletedIds((prev) => [...new Set([...prev, deleteTarget.id])]);
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (error) {
@@ -215,20 +217,19 @@ export default function LeaveTypes() {
         error.response?.data?.error ||
         "Failed to delete leave type. Please try again.";
       setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
 
-    setDeleteSubmitting(true);
     setApiError("");
 
     try {
-      await Promise.all(selectedIds.map((id) => deleteLeaveType(id)));
-      setLeaveTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      await Promise.all(
+        selectedIds.map((id) => deleteLeaveTypeMutation.mutateAsync(id)),
+      );
+      setDeletedIds((prev) => [...new Set([...prev, ...selectedIds])]);
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Failed to delete selected leave types:", error);
@@ -237,8 +238,6 @@ export default function LeaveTypes() {
         error.response?.data?.error ||
         "Failed to delete selected leave types. Please try again.";
       setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
@@ -294,6 +293,12 @@ export default function LeaveTypes() {
           Add Leave Type
         </button>
       </div>
+
+      {pageError && !showForm && !deleteTarget && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">

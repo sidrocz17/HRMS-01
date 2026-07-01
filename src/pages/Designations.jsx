@@ -5,16 +5,17 @@
 //  UI matches Department page exactly
 // ─────────────────────────────────────────────
 
-import { useEffect, useState, useMemo } from "react";
-import { v4 as uuidv4 } from "uuid";
+import { useState, useMemo } from "react";
 import StatusBadge      from "../components/employee/StatusBadge";
 import DesignationForm  from "../components/designation/DesignationForm";
 import DeleteConfirm    from "../components/designation/DeleteConfirm";
 import {
-  createDesignation,
-  fetchDesignations,
-  updateDesignation,
-} from "../api/designationApi";
+  useCreateDesignation,
+  useDeleteDesignation,
+  useDesignations,
+  useUpdateDesignation,
+} from "../hooks/query/useDesignations";
+import { designationSchema } from "../schemas/designationSchema";
 import { formatDisplayDate } from "../utils/date";
 
 const PAGE_SIZE = 8;
@@ -59,7 +60,6 @@ const DesignationIcon = () => (
 );
 
 export default function Designations() {
-  const [designations, setDesignations] = useState([]);
   const [search, setSearch]             = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // "all" | "active" | "inactive"
   const [selectedIds, setSelectedIds]   = useState([]);
@@ -70,45 +70,31 @@ export default function Designations() {
   const [formMode, setFormMode]         = useState("add");
   const [editTarget, setEditTarget]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [loading, setLoading]           = useState(false);
-  const [submitting, setSubmitting]     = useState(false);
+  const [deletedIds, setDeletedIds]     = useState([]);
   const [apiError, setApiError]         = useState("");
 
-  useEffect(() => {
-    loadDesignations();
-  }, []);
+  const designationsQuery = useDesignations();
+  const createDesignationMutation = useCreateDesignation();
+  const updateDesignationMutation = useUpdateDesignation();
+  const deleteDesignationMutation = useDeleteDesignation();
 
-  const loadDesignations = async () => {
-    setLoading(true);
+  const designations = useMemo(() => {
+    const designationList = Array.isArray(designationsQuery.data)
+      ? designationsQuery.data
+      : Array.isArray(designationsQuery.data?.data)
+        ? designationsQuery.data.data
+        : [];
 
-    try {
-      const data = await fetchDesignations();
-      console.log("✅ Designations fetched:", data);
-
-      const designationList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-          ? data.data
-          : [];
-
-      const mapped = designationList.map((designation, index) =>
-        normalizeDesignation(designation, index)
-      );
-
-      setDesignations((prev) => {
-        const fetchedIds = new Set(mapped.map((designation) => designation.id));
-        const missingLocalRows = prev.filter(
-          (designation) => !fetchedIds.has(designation.id)
-        );
-
-        return [...mapped, ...missingLocalRows];
-      });
-    } catch (error) {
-      console.error("❌ Failed to fetch designations:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return designationList
+      .map((designation, index) => normalizeDesignation(designation, index))
+      .filter((designation) => !deletedIds.includes(designation.id));
+  }, [designationsQuery.data, deletedIds]);
+  const loading = designationsQuery.isLoading;
+  const submitting =
+    createDesignationMutation.isPending || updateDesignationMutation.isPending;
+  const pageError = apiError || (designationsQuery.isError
+    ? "Failed to load designations. Please try again."
+    : "");
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
@@ -156,57 +142,22 @@ export default function Designations() {
   };
 
   const handleFormSubmit = async (formData) => {
-    setSubmitting(true);
     setApiError("");
+    const parsed = designationSchema.safeParse(formData);
 
-    const now = new Date().toLocaleDateString("en-GB", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid designation details.");
+      return;
+    }
 
     try {
       if (formMode === "add") {
-        const response = await createDesignation(formData);
-        const createdDesignation = response?.data || response;
-
-        setDesignations((prev) => [{
-          id: createdDesignation?.id || createdDesignation?.designationId || uuidv4(),
-          title: createdDesignation?.title || createdDesignation?.designationName || formData.title,
-          description: createdDesignation?.description || formData.description,
-          is_active:
-            createdDesignation?.isActive ??
-            createdDesignation?.is_active ??
-            formData.is_active,
-          created_at:
-            formatDisplayDate(createdDesignation?.createdAt || createdDesignation?.created_at) || now,
-          updated_at:
-            formatDisplayDate(createdDesignation?.updatedAt || createdDesignation?.updated_at) || now,
-        }, ...prev]);
+        await createDesignationMutation.mutateAsync(parsed.data);
       } else {
-        const response = await updateDesignation(editTarget.id, formData);
-        const updatedDesignation = response?.data || response;
-
-        setDesignations((prev) =>
-          prev.map((d) =>
-            d.id === editTarget.id
-              ? {
-                  ...d,
-                  title:
-                    updatedDesignation?.title ||
-                    updatedDesignation?.designationName ||
-                    formData.title,
-                  description:
-                    updatedDesignation?.description ?? formData.description,
-                  is_active:
-                    updatedDesignation?.isActive ??
-                    updatedDesignation?.is_active ??
-                    formData.is_active,
-                  updated_at:
-                    formatDisplayDate(updatedDesignation?.updatedAt || updatedDesignation?.updated_at) ||
-                    now,
-                }
-              : d
-          )
-        );
+        await updateDesignationMutation.mutateAsync({
+          id: editTarget.id,
+          data: parsed.data,
+        });
       }
 
       setShowForm(false);
@@ -218,27 +169,37 @@ export default function Designations() {
         error.response?.data?.error ||
         "Failed to save designation. Please try again.";
       setApiError(message);
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const handleDeleteClick   = (d) => setDeleteTarget(d);
-  const handleDeleteConfirm = () => {
-    setDesignations((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+  const handleDeleteConfirm = async () => {
+    await deleteDesignationMutation.mutateAsync(deleteTarget.id);
+    setDeletedIds((prev) => [...new Set([...prev, deleteTarget.id])]);
     setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
     setDeleteTarget(null);
   };
 
   const handleBulkDelete = () => {
-    setDesignations((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+    setDeletedIds((prev) => [...new Set([...prev, ...selectedIds])]);
     setSelectedIds([]);
   };
 
-  const handleToggleStatus = (id) =>
-    setDesignations((prev) =>
-      prev.map((d) => d.id === id ? { ...d, is_active: !d.is_active } : d)
-    );
+  const handleToggleStatus = async (designation) => {
+    setApiError("");
+    try {
+      await updateDesignationMutation.mutateAsync({
+        id: designation.id,
+        data: { ...designation, is_active: !designation.is_active },
+      });
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to update designation status.";
+      setApiError(message);
+    }
+  };
 
   // ── Pagination ────────────────────────────────
   const getPageNumbers = () => {
@@ -273,6 +234,12 @@ export default function Designations() {
           Add Designation
         </button>
       </div>
+
+      {pageError && !showForm && !deleteTarget && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
@@ -452,7 +419,7 @@ export default function Designations() {
                     {/* Status */}
                     <td className="px-4 py-4">
                       <button
-                        onClick={() => handleToggleStatus(d.id)}
+                        onClick={() => handleToggleStatus(d)}
                         title="Click to toggle status"
                         className="focus:outline-none"
                       >

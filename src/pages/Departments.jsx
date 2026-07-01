@@ -1,6 +1,6 @@
 // pages/Departments.jsx
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import StatusBadge from "../components/employee/StatusBadge";
 import ActionButtons from "../components/employee/ActionButtons";
 import DepartmentForm from "../components/department/DepartmentForm";
@@ -10,15 +10,15 @@ import {
   getMappedDesignations,
   mapDesignationsToDepartment,
 } from "../api/deptDesigApi";
-import { fetchDesignations } from "../api/designationApi";
+import { useDesignations } from "../hooks/query/useDesignations";
 import {
-  createDepartment,
-  deactivateDepartment,
-  deleteDepartment,
-  fetchDepartmentById,
-  fetchDepartments,
-  updateDepartment,
-} from "../api/departmentApi";
+  useCreateDepartment,
+  useDeactivateDepartment,
+  useDeleteDepartment,
+  useDepartments,
+  useUpdateDepartment,
+} from "../hooks/query/useDepartments";
+import { departmentSchema } from "../schemas/departmentSchema";
 import { formatDisplayDate } from "../utils/date";
 
 const PAGE_SIZE = 7;
@@ -101,8 +101,6 @@ const getMappedDesignationIds = (payload) =>
     .map((value) => String(value).trim());
 
 export default function Departments() {
-  // ── Data state ────────────────────────────────
-  const [departments, setDepartments] = useState([]); // empty — GET API fills this
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -113,12 +111,8 @@ export default function Departments() {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewTarget, setViewTarget] = useState(null);
-  const [viewLoading, setViewLoading] = useState(false);
 
   // ── API state ─────────────────────────────────
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
 
   const [showMapModal, setShowMapModal] = useState(false);
@@ -129,41 +123,32 @@ export default function Departments() {
   const [mapApiError, setMapApiError] = useState("");
   const [mapLoading, setMapLoading] = useState(false);
 
-  // ── Load departments on page open ─────────────
-  useEffect(() => {
-    loadDepartments();
-  }, []);
+  const departmentsQuery = useDepartments();
+  const designationsQuery = useDesignations();
+  const createDepartmentMutation = useCreateDepartment();
+  const updateDepartmentMutation = useUpdateDepartment();
+  const deactivateDepartmentMutation = useDeactivateDepartment();
+  const deleteDepartmentMutation = useDeleteDepartment();
 
-  const loadDepartments = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchDepartments();
-      console.log("✅ Departments fetched:", data);
-
-      const departmentList = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.data)
-          ? data.data
-          : [];
-
-      const mapped = departmentList.map((department, index) =>
-        normalizeDepartment(department, index),
-      );
-
-      setDepartments((prev) => {
-        const fetchedIds = new Set(mapped.map((dept) => dept.id));
-        const missingLocalRows = prev.filter(
-          (dept) => !fetchedIds.has(dept.id),
-        );
-
-        return [...mapped, ...missingLocalRows];
-      });
-    } catch (error) {
-      console.error("❌ Failed to fetch departments:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const departments = useMemo(
+    () => toArray(departmentsQuery.data).map((department, index) =>
+      normalizeDepartment(department, index),
+    ),
+    [departmentsQuery.data],
+  );
+  const loading = departmentsQuery.isLoading;
+  const submitting =
+    createDepartmentMutation.isPending || updateDepartmentMutation.isPending;
+  const deleteSubmitting = deleteDepartmentMutation.isPending;
+  const pageError = apiError || (departmentsQuery.isError
+    ? "Failed to load departments. Please try again."
+    : "");
+  const designationsForMap = useMemo(
+    () => toArray(designationsQuery.data)
+      .map((designation, index) => normalizeDesignation(designation, index))
+      .filter((designation) => designation.id && designation.title),
+    [designationsQuery.data],
+  );
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(
@@ -216,31 +201,8 @@ export default function Departments() {
   };
 
   const handleView = async (dept) => {
-    setViewLoading(true);
     setApiError("");
-
-    try {
-      const response = await fetchDepartmentById(dept.id);
-      setViewTarget(normalizeDepartment(response));
-    } catch (error) {
-      console.error("❌ Failed to fetch department details:", error);
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Failed to load department details. Please try again.";
-      setApiError(message);
-    } finally {
-      setViewLoading(false);
-    }
-  };
-
-  const loadDesignations = async () => {
-    const data = await fetchDesignations();
-    const designationList = toArray(data);
-
-    return designationList
-      .map((designation, index) => normalizeDesignation(designation, index))
-      .filter((designation) => designation.id && designation.title);
+    setViewTarget(dept);
   };
 
   const handleOpenMapModal = async (dept) => {
@@ -250,7 +212,7 @@ export default function Departments() {
 
     try {
       const [designations, mappedResponse] = await Promise.all([
-        loadDesignations(),
+        Promise.resolve(designationsForMap),
         getMappedDesignations(dept.id),
       ]);
 
@@ -295,25 +257,22 @@ export default function Departments() {
 
   // ── Form submit ───────────────────────────────
   const handleFormSubmit = async (formData) => {
-    setSubmitting(true);
     setApiError("");
+    const parsed = departmentSchema.safeParse(formData);
+
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid department details.");
+      return;
+    }
 
     try {
       if (formMode === "add") {
-        // ── 1. POST to API ─────────────────────
-        const response = await createDepartment(formData);
-        console.log("✅ Department created:", response);
-        // response = "Department added successfully"
-
-        // ── 2. Refresh table from GET API ──────
-        await loadDepartments();
-        console.log("✅ Table refreshed");
+        await createDepartmentMutation.mutateAsync(parsed.data);
       } else {
-        await updateDepartment(editTarget.id, formData);
-        console.log("✅ Department updated");
-
-        await loadDepartments();
-        console.log("✅ Table refreshed");
+        await updateDepartmentMutation.mutateAsync({
+          id: editTarget.id,
+          data: parsed.data,
+        });
       }
 
       setShowForm(false);
@@ -325,8 +284,6 @@ export default function Departments() {
         error.response?.data?.error ||
         "Something went wrong. Please try again.";
       setApiError(message);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -339,12 +296,10 @@ export default function Departments() {
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
 
-    setDeleteSubmitting(true);
     setApiError("");
 
     try {
-      await deleteDepartment(deleteTarget.id);
-      setDepartments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      await deleteDepartmentMutation.mutateAsync(deleteTarget.id);
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (error) {
@@ -354,20 +309,18 @@ export default function Departments() {
         error.response?.data?.error ||
         "Failed to delete department. Please try again.";
       setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
 
-    setDeleteSubmitting(true);
     setApiError("");
 
     try {
-      await Promise.all(selectedIds.map((id) => deleteDepartment(id)));
-      setDepartments((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      await Promise.all(
+        selectedIds.map((id) => deleteDepartmentMutation.mutateAsync(id)),
+      );
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Failed to delete selected departments:", error);
@@ -376,8 +329,6 @@ export default function Departments() {
         error.response?.data?.error ||
         "Failed to delete selected departments. Please try again.";
       setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
@@ -386,14 +337,7 @@ export default function Departments() {
     if (!dept.is_active) return;
 
     try {
-      await deactivateDepartment(dept.id);
-      setDepartments((prev) =>
-        prev.map((item) =>
-          item.id === dept.id
-            ? normalizeDepartment({ ...item, is_active: false })
-            : item,
-        ),
-      );
+      await deactivateDepartmentMutation.mutateAsync(dept.id);
     } catch (error) {
       console.error("❌ Failed to deactivate department:", error);
       const message =
@@ -456,6 +400,12 @@ export default function Departments() {
           Add Department
         </button>
       </div>
+
+      {pageError && !showForm && !deleteTarget && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4">
@@ -946,35 +896,6 @@ export default function Departments() {
               >
                 Close
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {viewLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="rounded-2xl bg-white px-6 py-5 shadow-xl border border-gray-100">
-            <div className="flex items-center gap-3 text-sm text-gray-600">
-              <svg
-                className="h-5 w-5 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              Loading department details...
             </div>
           </div>
         </div>

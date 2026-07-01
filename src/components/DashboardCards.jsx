@@ -1,57 +1,14 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getEmployeeSummary, getLeaveSummary } from "../api/dashboardApi";
 
-const staticCards = [
-  {
-    label: "Payroll",
-    value: 7,
-    bg: "bg-[#2d7d3a]",
-    textColor: "text-green-300",
-    valueColor: "text-white",
-    icon: (
-      <svg className="w-12 h-12 opacity-80" fill="currentColor" viewBox="0 0 20 20">
-        <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
-        <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
-      </svg>
-    ),
-    trend: "Processed",
-    sub: "this cycle",
-  },
-];
-
-export default function DashboardCards() {
+export default function DashboardCards({
+  employeeSummary = null,
+  leaveSummary = null,
+  attendanceStats = null,
+  loading = false,
+  attendanceLoading = false,
+  error = null,
+}) {
   const navigate = useNavigate();
-  const [employeeSummary, setEmployeeSummary] = useState(null);
-  const [leaveSummary, setLeaveSummary] = useState(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getEmployeeSummary()
-      .then((data) => {
-        if (!isMounted) return;
-        setEmployeeSummary(data || null);
-      })
-      .catch((error) => {
-        console.error("❌ Failed to load dashboard employee summary:", error);
-        if (isMounted) setEmployeeSummary(null);
-      });
-
-    getLeaveSummary()
-      .then((data) => {
-        if (!isMounted) return;
-        setLeaveSummary(data || null);
-      })
-      .catch((error) => {
-        console.error("❌ Failed to load dashboard leave summary:", error);
-        if (isMounted) setLeaveSummary(null);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const employeeCardSubtext = (() => {
     const inactiveEmployees = employeeSummary?.inactiveEmployees ?? 0;
@@ -93,11 +50,32 @@ export default function DashboardCards() {
       trend: `${leaveSummary?.approvedRequests ?? 0} approved`,
       sub: `${leaveSummary?.pendingRequests ?? 0} pending requests`,
     },
-    staticCards[0],
+    {
+      label: "Attendance",
+      value: attendanceStats?.totalToday ?? 0,
+      bg: "bg-[#2d7d3a]",
+      textColor: "text-green-300",
+      valueColor: "text-white",
+      loading: attendanceLoading,
+      icon: (
+        <svg className="w-12 h-12 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2 2a1 1 0 001.414-1.414L11 9.586V6z" clipRule="evenodd" />
+        </svg>
+      ),
+      trend: `${attendanceStats?.present ?? 0} present`,
+      sub: `${attendanceStats?.late ?? 0} late arrivals`,
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+    <div className="mt-6">
+      {error ? (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          Unable to load dashboard stats right now.
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {cards.map((card) => (
         <div
           key={card.label}
@@ -106,20 +84,30 @@ export default function DashboardCards() {
           <div className="p-6 flex items-center justify-between">
             {/* Left: Number + Label */}
             <div className="flex flex-col gap-1">
-              <span className={`text-5xl font-bold ${card.valueColor} leading-none`}>
-                {card.value}
-              </span>
-              <span className={`text-base font-semibold ${card.textColor} mt-1`}>
-                {card.label}
-              </span>
-              <div className="flex items-center gap-1.5 mt-2">
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 text-white"
-                >
-                  {card.trend}
-                </span>
-                <span className={`text-xs ${card.textColor} opacity-80`}>{card.sub}</span>
-              </div>
+              {(card.loading ?? loading) ? (
+                <div className="animate-pulse space-y-3">
+                  <div className="h-12 w-20 rounded bg-white/30" />
+                  <div className="h-4 w-24 rounded bg-white/20" />
+                  <div className="h-5 w-40 rounded bg-white/20" />
+                </div>
+              ) : (
+                <>
+                  <span className={`text-5xl font-bold ${card.valueColor} leading-none`}>
+                    {card.value}
+                  </span>
+                  <span className={`text-base font-semibold ${card.textColor} mt-1`}>
+                    {card.label}
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 text-white"
+                    >
+                      {card.trend}
+                    </span>
+                    <span className={`text-xs ${card.textColor} opacity-80`}>{card.sub}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Right: Icon */}
@@ -139,6 +127,11 @@ export default function DashboardCards() {
 
               if (card.label === "Employees") {
                 navigate("/employee-management");
+                return;
+              }
+
+              if (card.label === "Attendance") {
+                navigate("/attendance");
               }
             }}
             className="w-full bg-black/10 px-6 py-2.5 flex items-center justify-between"
@@ -150,6 +143,7 @@ export default function DashboardCards() {
           </button>
         </div>
       ))}
+      </div>
     </div>
   );
 }

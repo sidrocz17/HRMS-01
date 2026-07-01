@@ -5,16 +5,17 @@
 //  POST payload: { name, isActive, createdBy, updatedBy }
 // ─────────────────────────────────────────────
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import EmployeeTypeForm from "../components/employeetype/EmployeeTypeForm";
 import DeleteConfirm    from "../components/employeetype/DeleteConfirm";
 import {
-  createEmployeeType,
-  deactivateEmployeeType,
-  deleteEmployeeType,
-  fetchEmployeeTypes,
-  updateEmployeeType,
-} from "../api/employeeTypeApi";
+  useCreateEmployeeType,
+  useDeactivateEmployeeType,
+  useDeleteEmployeeType,
+  useEmployeeTypes,
+  useUpdateEmployeeType,
+} from "../hooks/query/useEmployeeTypes";
+import { employeeTypeSchema } from "../schemas/employeeTypeSchema";
 import { getRoleFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 8;
@@ -58,7 +59,6 @@ export default function EmployeeTypes() {
 
   // ── Data state ────────────────────────────────
   // Each item shape: { id, name, isActive, createdOn }
-  const [employeeTypes, setEmployeeTypes] = useState([]);
   const [search, setSearch]               = useState("");
   const [statusFilter, setStatusFilter]   = useState("all");
   const [selectedIds, setSelectedIds]     = useState([]);
@@ -71,39 +71,30 @@ export default function EmployeeTypes() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── API state ─────────────────────────────────
-  const [loading, setLoading]       = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [apiError, setApiError]     = useState("");
 
-  // ── Load on mount ─────────────────────────────
-  useEffect(() => {
-    if (role === "admin") loadEmployeeTypes();
-  }, []);
+  const employeeTypesQuery = useEmployeeTypes({ enabled: role === "admin" });
+  const createEmployeeTypeMutation = useCreateEmployeeType();
+  const updateEmployeeTypeMutation = useUpdateEmployeeType();
+  const deactivateEmployeeTypeMutation = useDeactivateEmployeeType();
+  const deleteEmployeeTypeMutation = useDeleteEmployeeType();
 
-  const loadEmployeeTypes = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchEmployeeTypes();
-      console.log("✅ Raw GET response:", data);
-
-      // ── Map exactly to GET response fields ────
-      // GET returns: { id, name, isActive, createdOn, createdBy, updatedOn, updatedBy }
-      const mapped = data.map((d) => ({
-        id:        d.id,
-        name:      d.name,
-        isActive:  d.isActive,
-        createdOn: d.createdOn,
-      }));
-
-      console.log("✅ Mapped:", mapped);
-      setEmployeeTypes(mapped);
-    } catch (error) {
-      console.error("❌ Failed to fetch:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const employeeTypes = useMemo(
+    () => (Array.isArray(employeeTypesQuery.data) ? employeeTypesQuery.data : []).map((d) => ({
+      id:        d.id,
+      name:      d.name,
+      isActive:  d.isActive,
+      createdOn: d.createdOn,
+    })),
+    [employeeTypesQuery.data],
+  );
+  const loading = employeeTypesQuery.isLoading;
+  const submitting =
+    createEmployeeTypeMutation.isPending || updateEmployeeTypeMutation.isPending;
+  const deleteSubmitting = deleteEmployeeTypeMutation.isPending;
+  const pageError = apiError || (employeeTypesQuery.isError
+    ? "Failed to load employee types. Please try again."
+    : "");
 
   // ── Filtered + paginated ──────────────────────
   const filtered = useMemo(() =>
@@ -150,37 +141,22 @@ export default function EmployeeTypes() {
   };
 
   const handleFormSubmit = async (formData) => {
-    setSubmitting(true);
     setApiError("");
+    const parsed = employeeTypeSchema.safeParse(formData);
+
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid employee type details.");
+      return;
+    }
 
     try {
       if (formMode === "add") {
-        // formData = { name, isActive }
-        // API also needs createdBy/updatedBy — handled inside employeeTypeApi.js
-        await createEmployeeType(formData);
-        console.log("✅ Employee type created");
-        await loadEmployeeTypes(); // refresh from GET
+        await createEmployeeTypeMutation.mutateAsync(parsed.data);
       } else {
-        const response = await updateEmployeeType(editTarget.id, formData);
-        const updatedEmployeeType = response?.data || response;
-
-        setEmployeeTypes((prev) =>
-          prev.map((d) =>
-            d.id === editTarget.id
-              ? {
-                  ...d,
-                  name:
-                    updatedEmployeeType?.name ||
-                    updatedEmployeeType?.typeName ||
-                    formData.name,
-                  isActive:
-                    updatedEmployeeType?.isActive ??
-                    updatedEmployeeType?.is_active ??
-                    formData.isActive,
-                }
-              : d
-          )
-        );
+        await updateEmployeeTypeMutation.mutateAsync({
+          id: editTarget.id,
+          data: parsed.data,
+        });
       }
 
       setShowForm(false);
@@ -193,8 +169,6 @@ export default function EmployeeTypes() {
         error.response?.data?.error   ||
         `Error ${error.response?.status || ""}: Something went wrong.`;
       setApiError(message);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -205,12 +179,7 @@ export default function EmployeeTypes() {
     setApiError("");
 
     try {
-      await deactivateEmployeeType(item.id);
-      setEmployeeTypes((prev) =>
-        prev.map((d) =>
-          d.id === item.id ? { ...d, isActive: false } : d
-        )
-      );
+      await deactivateEmployeeTypeMutation.mutateAsync(item.id);
     } catch (error) {
       console.error("❌ Failed to deactivate employee type:", error);
       const message =
@@ -230,12 +199,10 @@ export default function EmployeeTypes() {
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
 
-    setDeleteSubmitting(true);
     setApiError("");
 
     try {
-      await deleteEmployeeType(deleteTarget.id);
-      setEmployeeTypes((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+      await deleteEmployeeTypeMutation.mutateAsync(deleteTarget.id);
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (error) {
@@ -245,20 +212,18 @@ export default function EmployeeTypes() {
         error.response?.data?.error ||
         `Error ${error.response?.status || ""}: Failed to delete employee type.`;
       setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
 
-    setDeleteSubmitting(true);
     setApiError("");
 
     try {
-      await Promise.all(selectedIds.map((id) => deleteEmployeeType(id)));
-      setEmployeeTypes((prev) => prev.filter((d) => !selectedIds.includes(d.id)));
+      await Promise.all(
+        selectedIds.map((id) => deleteEmployeeTypeMutation.mutateAsync(id)),
+      );
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Failed to delete selected employee types:", error);
@@ -267,8 +232,6 @@ export default function EmployeeTypes() {
         error.response?.data?.error ||
         `Error ${error.response?.status || ""}: Failed to delete selected employee types.`;
       setApiError(message);
-    } finally {
-      setDeleteSubmitting(false);
     }
   };
 
@@ -324,6 +287,12 @@ export default function EmployeeTypes() {
           Add Employee Type
         </button>
       </div>
+
+      {pageError && !showForm && !deleteTarget && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">

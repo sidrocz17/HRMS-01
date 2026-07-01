@@ -31,6 +31,7 @@ export default function AttendanceTable({ records = [], isAdminOrHR = false, loa
 
   // ── Columns ───────────────────────────────────
   const columns = [
+    ...(isAdminOrHR ? ["Employee"] : []),
     "Date",
     "In Time",
     "Out Time",
@@ -100,6 +101,21 @@ export default function AttendanceTable({ records = [], isAdminOrHR = false, loa
                 key={record.id}
                 className="group hover:bg-gray-50/80 transition-colors duration-100"
               >
+                {isAdminOrHR && (
+                  <td className="px-4 py-4">
+                    <div className="text-sm">
+                      <p className="font-semibold text-gray-800">
+                        {record.employeeName || "Employee"}
+                      </p>
+                      {record.employeeId && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {record.employeeId}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                )}
+
                 {/* Date */}
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-2 text-sm text-gray-600">

@@ -21,7 +21,6 @@ import Offboarding from "./pages/Offboarding";
 import MyProfile from "./pages/MyProfile";
 import LeaveReports from "./pages/LeaveReports";
 import AttendanceReports from "./pages/AttendanceReports";
-import { EmployeeProvider } from "./context/EmployeeContext";
 
 function DashboardLayout({ page }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -65,8 +64,7 @@ function DashboardLayout({ page }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <EmployeeProvider>
-        <Routes>
+      <Routes>
           {/* Public */}
           <Route path="/" element={<Login />} />
 
@@ -211,8 +209,7 @@ export default function App() {
 
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </EmployeeProvider>
+      </Routes>
     </BrowserRouter>
   );
 }

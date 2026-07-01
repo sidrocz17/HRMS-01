@@ -1,87 +1,118 @@
 // src/components/leave/ApplyLeaveModal.jsx
 // ─────────────────────────────────────────────
 //  Apply Leave Form Modal
-//  Features: Date picker, Type of Day (Full/Half), Half Selection toggle
+//  Form state: React Hook Form + Zod
+//  Server state: TanStack Query mutation
+//  Modal state: Zustand
 // ─────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import useLeaveStore from "../../store/useLeaveStore";
+import { useApplyLeave } from "../../hooks/mutations/useApplyLeave";
+import {
+  useLeaveBalance,
+  useLeaveTypes,
+} from "../../hooks/queries/useLeaveBalance";
+import { getApiErrorMessage } from "../../utils/leaveTransformers";
+import { getUserFromToken } from "../../utils/auth";
+import {
+  applyLeaveDefaultValues,
+  applyLeaveSchema,
+  LEAVE_REASON_MAX_LENGTH,
+} from "../../schemas/leaveSchema";
 
-const EMPTY_FORM = {
-  emp_leave_id: "",
-  from_date: "",
-  to_date: "",
-  days: 0,
-  type_of_day: "full", // "full" or "half"
-  half_selection: "first", // "first" or "second"
-  reason: "",
-};
+const calculateLeaveDays = ({ fromDate, toDate, typeOfDay }) => {
+  if (!fromDate || !toDate) return 0;
 
-const calculateLeaveDays = ({ from_date, to_date, type_of_day }) => {
-  if (!from_date || !to_date) return 0;
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
 
-  const from = new Date(from_date);
-  const to = new Date(to_date);
-
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) {
     return 0;
   }
 
   const diffTime = Math.abs(to - from);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-  return type_of_day === "half" ? 0.5 : diffDays;
+  return typeOfDay === "half" ? 0.5 : diffDays;
 };
 
-export default function ApplyLeaveModal({
-  onSubmit,
-  onClose,
-  leaveTypes = [],
-}) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [errors, setErrors] = useState({});
+export default function ApplyLeaveModal() {
+  const { empId } = getUserFromToken();
+  const closeApplyModal = useLeaveStore((state) => state.closeApplyModal);
+  const { data: leaveBalance = [] } = useLeaveBalance(empId);
+  const { data: leaveTypesReference = [] } = useLeaveTypes();
 
-  // ── Calculate days ────────────────────────────
-  useEffect(() => {
-    const nextDays = calculateLeaveDays(form);
-    setForm((prev) => (prev.days === nextDays ? prev : { ...prev, days: nextDays }));
-  }, [form.from_date, form.to_date, form.type_of_day]);
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(applyLeaveSchema),
+    defaultValues: applyLeaveDefaultValues,
+    mode: "onTouched",
+  });
 
-  const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
-  };
+  const [fromDate, toDate, typeOfDay, halfSelection, reason] = useWatch({
+    control,
+    name: ["fromDate", "toDate", "typeOfDay", "halfSelection", "reason"],
+  });
 
-  const validate = () => {
-    const newErrors = {};
+  const applyLeaveMutation = useApplyLeave({
+    onSuccess: () => {
+      reset(applyLeaveDefaultValues);
+      closeApplyModal();
+    },
+  });
 
-    if (!form.emp_leave_id) newErrors.emp_leave_id = "Leave type is required.";
-    if (!form.from_date) newErrors.from_date = "Start date is required.";
-    if (!form.to_date) newErrors.to_date = "End date is required.";
-    if (form.from_date && form.to_date && new Date(form.from_date) > new Date(form.to_date)) {
-      newErrors.to_date = "End date must be after start date.";
-    }
+  const leaveTypes = useMemo(() => {
+    const resolveLeaveTypeName = (balanceItem) => {
+      if (balanceItem.leave_type_id) {
+        const matchedById = leaveTypesReference.find(
+          (type) => String(type.id) === String(balanceItem.leave_type_id)
+        );
+        if (matchedById) return matchedById.name;
+      }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+      const normalizedName = String(balanceItem.leave_type || "")
+        .trim()
+        .toLowerCase();
+      const matchedByName = leaveTypesReference.find(
+        (type) => String(type.name).trim().toLowerCase() === normalizedName
+      );
 
-  const handleSubmit = () => {
-    if (!validate()) return;
+      return matchedByName?.name || balanceItem.leave_type;
+    };
 
-    const requestedDays = calculateLeaveDays(form);
+    return leaveBalance.map((item) => ({
+      id: item.id,
+      name: resolveLeaveTypeName(item),
+    }));
+  }, [leaveBalance, leaveTypesReference]);
 
-    onSubmit({
-      empLeaveId: form.emp_leave_id,
-      leaveDay: form.type_of_day === "half" ? "HALF" : "FULL",
-      description: form.reason,
-      noOfDays: requestedDays,
-      startDate: form.from_date,
-      endDate: form.to_date,
+  const days = calculateLeaveDays({ fromDate, toDate, typeOfDay });
+  const isMutating = applyLeaveMutation.isPending || isSubmitting;
+
+  const onSubmit = (values) => {
+    applyLeaveMutation.mutate({
+      empLeaveId: values.leaveType,
+      leaveDay: values.typeOfDay === "half" ? "HALF" : "FULL",
+      description: values.reason,
+      noOfDays: calculateLeaveDays(values),
+      startDate: values.fromDate,
+      endDate: values.toDate,
     });
   };
 
   const handleBackdrop = (e) => {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget && !isMutating) {
+      closeApplyModal();
+    }
   };
 
   const inputClass = (field) =>
@@ -97,17 +128,20 @@ export default function ApplyLeaveModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
       onClick={handleBackdrop}
     >
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
           <div>
             <h2 className="text-base font-bold text-gray-900">Apply Leave</h2>
             <p className="text-xs text-gray-400 mt-0.5">Submit a new leave request</p>
           </div>
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+            type="button"
+            onClick={closeApplyModal}
+            disabled={isMutating}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all disabled:opacity-50"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -115,18 +149,15 @@ export default function ApplyLeaveModal({
           </button>
         </div>
 
-        {/* Body */}
         <div className="px-6 py-5 space-y-4">
-
-          {/* Leave Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Leave Type <span className="text-red-500">*</span>
             </label>
             <select
-              value={form.emp_leave_id}
-              onChange={(e) => handleChange("emp_leave_id", e.target.value)}
-              className={inputClass("emp_leave_id")}
+              {...register("leaveType")}
+              className={inputClass("leaveType")}
+              disabled={isMutating}
             >
               <option value="">Select leave type</option>
               {leaveTypes.map((type) => (
@@ -135,74 +166,69 @@ export default function ApplyLeaveModal({
                 </option>
               ))}
             </select>
-            {errors.emp_leave_id && (
+            {errors.leaveType && (
               <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
-                {errors.emp_leave_id}
+                {errors.leaveType.message}
               </p>
             )}
           </div>
 
-          {/* Leave Duration Header */}
           <div className="pt-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Leave Duration</p>
           </div>
 
-          {/* Dates: From & To */}
           <div className="grid grid-cols-2 gap-3">
-            {/* From Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Start Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                value={form.from_date}
-                onChange={(e) => handleChange("from_date", e.target.value)}
-                className={inputClass("from_date")}
+                {...register("fromDate")}
+                disabled={isMutating}
+                className={inputClass("fromDate")}
               />
-              {errors.from_date && (
+              {errors.fromDate && (
                 <p className="mt-1.5 text-xs text-red-500">
-                  {errors.from_date}
+                  {errors.fromDate.message}
                 </p>
               )}
             </div>
 
-            {/* To Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 End Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
-                value={form.to_date}
-                onChange={(e) => handleChange("to_date", e.target.value)}
-                className={inputClass("to_date")}
+                {...register("toDate")}
+                disabled={isMutating}
+                className={inputClass("toDate")}
               />
-              {errors.to_date && (
+              {errors.toDate && (
                 <p className="mt-1.5 text-xs text-red-500">
-                  {errors.to_date}
+                  {errors.toDate.message}
                 </p>
               )}
             </div>
           </div>
 
-          {/* No. of Days (read-only) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               No. of Days
             </label>
             <input
               type="text"
-              value={form.days}
+              value={days}
               disabled
+              readOnly
               className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-600 font-semibold cursor-not-allowed"
             />
           </div>
 
-          {/* Type of Day */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2.5">
               Type of Day <span className="text-red-500">*</span>
@@ -211,10 +237,9 @@ export default function ApplyLeaveModal({
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  name="type_of_day"
                   value="full"
-                  checked={form.type_of_day === "full"}
-                  onChange={(e) => handleChange("type_of_day", e.target.value)}
+                  {...register("typeOfDay")}
+                  disabled={isMutating}
                   className="w-4 h-4 text-[#1a2240] border-gray-300 focus:ring-2 focus:ring-[#1a2240]"
                 />
                 <span className="text-sm text-gray-700">Full Day</span>
@@ -222,10 +247,9 @@ export default function ApplyLeaveModal({
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  name="type_of_day"
                   value="half"
-                  checked={form.type_of_day === "half"}
-                  onChange={(e) => handleChange("type_of_day", e.target.value)}
+                  {...register("typeOfDay")}
+                  disabled={isMutating}
                   className="w-4 h-4 text-[#1a2240] border-gray-300 focus:ring-2 focus:ring-[#1a2240]"
                 />
                 <span className="text-sm text-gray-700">Half Day</span>
@@ -233,8 +257,7 @@ export default function ApplyLeaveModal({
             </div>
           </div>
 
-          {/* Half Selection (only if Half Day selected) */}
-          {form.type_of_day === "half" && (
+          {typeOfDay === "half" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2.5">
                 Half Selection <span className="text-red-500">*</span>
@@ -242,9 +265,12 @@ export default function ApplyLeaveModal({
               <div className="inline-flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-200">
                 <button
                   type="button"
-                  onClick={() => handleChange("half_selection", "first")}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    form.half_selection === "first"
+                  onClick={() =>
+                    setValue("halfSelection", "first", { shouldDirty: true })
+                  }
+                  disabled={isMutating}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all disabled:opacity-60 ${
+                    halfSelection === "first"
                       ? "bg-[#5b4ce8] text-white shadow-sm"
                       : "text-gray-600 hover:text-gray-800"
                   }`}
@@ -253,9 +279,12 @@ export default function ApplyLeaveModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleChange("half_selection", "second")}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    form.half_selection === "second"
+                  onClick={() =>
+                    setValue("halfSelection", "second", { shouldDirty: true })
+                  }
+                  disabled={isMutating}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all disabled:opacity-60 ${
+                    halfSelection === "second"
                       ? "bg-[#5b4ce8] text-white shadow-sm"
                       : "text-gray-600 hover:text-gray-800"
                   }`}
@@ -266,42 +295,59 @@ export default function ApplyLeaveModal({
             </div>
           )}
 
-          {/* Reason */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Reason
-              <span className="text-gray-400 font-normal ml-1">(optional)</span>
+              Reason <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={3}
+              maxLength={LEAVE_REASON_MAX_LENGTH}
               placeholder="Enter reason for leave..."
-              value={form.reason}
-              onChange={(e) => handleChange("reason", e.target.value)}
-              className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none
-                focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10 transition-all
-                resize-none placeholder:text-gray-300"
+              {...register("reason")}
+              disabled={isMutating}
+              className={`w-full px-4 py-2.5 text-sm border rounded-xl outline-none
+                focus:ring-2 transition-all resize-none placeholder:text-gray-300 disabled:opacity-60
+                ${errors.reason
+                  ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100"
+                  : "border-gray-200 focus:border-[#1a2240] focus:ring-[#1a2240]/10"
+                }`}
             />
+            <div className="mt-1.5 flex items-center justify-between gap-3">
+              {errors.reason ? (
+                <p className="text-xs text-red-500">{errors.reason.message}</p>
+              ) : (
+                <p className="text-xs text-gray-400">Minimum 10 characters.</p>
+              )}
+              <p className="text-xs text-gray-400">
+                {String(reason || "").length}/{LEAVE_REASON_MAX_LENGTH}
+              </p>
+            </div>
           </div>
-
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100 sticky bottom-0">
+          {applyLeaveMutation.isError && (
+            <p className="mr-auto text-xs font-medium text-red-600">
+              {getApiErrorMessage(applyLeaveMutation.error, "Failed to apply leave")}
+            </p>
+          )}
           <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+            type="button"
+            onClick={closeApplyModal}
+            disabled={isMutating}
+            className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
           >
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
-            className="px-5 py-2 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm"
+            type="submit"
+            disabled={isMutating}
+            className="px-5 py-2 text-sm font-semibold text-white bg-[#1a2240] hover:bg-[#243055] active:scale-95 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Submit
+            {applyLeaveMutation.isPending ? "Submitting..." : "Submit"}
           </button>
         </div>
-
-      </div>
+      </form>
     </div>
   );
 }

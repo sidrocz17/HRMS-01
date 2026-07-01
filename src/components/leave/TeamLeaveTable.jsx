@@ -3,8 +3,10 @@
 //  Team Leaves — HR/Admin only, shows all team leave requests
 // ─────────────────────────────────────────────
 
-import { useState } from "react";
 import { getUserFromToken } from "../../utils/auth";
+import useLeaveStore from "../../store/useLeaveStore";
+import { useTeamLeaves } from "../../hooks/queries/useTeamLeaves";
+import { getApiErrorMessage } from "../../utils/leaveTransformers";
 
 const StatusBadge = ({ status }) => {
   const normalizedStatus = (() => {
@@ -48,9 +50,17 @@ const Tooltip = ({ text, children }) => (
   </div>
 );
 
-export default function TeamLeaveTable({ data, role, onApprove, onView }) {
-  const [search, setSearch] = useState("");
+export default function TeamLeaveTable({ onView }) {
+  const search = useLeaveStore((state) => state.filters.teamSearch);
+  const setFilters = useLeaveStore((state) => state.setFilters);
+  const openApproveModal = useLeaveStore((state) => state.openApproveModal);
   const user = getUserFromToken();
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useTeamLeaves(user?.empId);
 
   const filtered = data.filter(
     (leave) =>
@@ -73,13 +83,13 @@ export default function TeamLeaveTable({ data, role, onApprove, onView }) {
             type="text"
             placeholder="Search by employee or leave type..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilters({ teamSearch: e.target.value })}
             className="w-full pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none
               focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10 transition-all placeholder:text-gray-300"
           />
           {search && (
             <button
-              onClick={() => setSearch("")}
+              onClick={() => setFilters({ teamSearch: "" })}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +116,19 @@ export default function TeamLeaveTable({ data, role, onApprove, onView }) {
           </thead>
 
           <tbody className="divide-y divide-gray-50">
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-400">
+                  Loading team leaves...
+                </td>
+              </tr>
+            ) : isError ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-12 text-center text-sm text-red-600">
+                  {getApiErrorMessage(error, "Failed to load leave requests")}
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-16 text-center">
                   <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -233,7 +255,7 @@ export default function TeamLeaveTable({ data, role, onApprove, onView }) {
                             <button
                               onClick={() => {
                                 if (isOwnLeave) return;
-                                onApprove(leave, "approve");
+                                openApproveModal(leave, "approve");
                               }}
                               disabled={isOwnLeave}
                               className={`p-1.5 rounded-lg transition-all duration-150 ${
@@ -259,7 +281,7 @@ export default function TeamLeaveTable({ data, role, onApprove, onView }) {
                             <button
                               onClick={() => {
                                 if (isOwnLeave) return;
-                                onApprove(leave, "reject");
+                                openApproveModal(leave, "reject");
                               }}
                               disabled={isOwnLeave}
                               className={`p-1.5 rounded-lg transition-all duration-150 ${

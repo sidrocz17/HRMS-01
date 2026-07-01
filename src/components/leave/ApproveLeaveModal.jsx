@@ -5,29 +5,37 @@
 // ─────────────────────────────────────────────
 
 import { useState } from "react";
+import useLeaveStore from "../../store/useLeaveStore";
+import { useApproveLeave } from "../../hooks/mutations/useApproveLeave";
+import { getApiErrorMessage } from "../../utils/leaveTransformers";
 
-export default function ApproveLeaveModal({
-  leave,
-  action,
-  onApprove,
-  onReject,
-  onClose,
-}) {
+export default function ApproveLeaveModal() {
+  const leave = useLeaveStore((state) => state.selectedLeave);
+  const action = useLeaveStore((state) => state.selectedAction);
+  const closeApproveModal = useLeaveStore((state) => state.closeApproveModal);
   const [remarks, setRemarks] = useState("");
+  const approvalMutation = useApproveLeave({
+    onSuccess: () => {
+      setRemarks("");
+      closeApproveModal();
+    },
+  });
 
   const handleApprove = () => {
-    onApprove();
-    setRemarks("");
+    approvalMutation.mutate({ leaveId: leave.id, action: "approve" });
   };
 
   const handleReject = () => {
-    onReject(remarks);
-    setRemarks("");
+    approvalMutation.mutate({ leaveId: leave.id, action: "reject", remarks });
   };
 
   const handleBackdrop = (e) => {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget && !approvalMutation.isPending) {
+      closeApproveModal();
+    }
   };
+
+  if (!leave) return null;
 
   return (
     <div
@@ -49,7 +57,8 @@ export default function ApproveLeaveModal({
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={closeApproveModal}
+            disabled={approvalMutation.isPending}
             className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,35 +148,46 @@ export default function ApproveLeaveModal({
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+          {approvalMutation.isError && (
+            <p className="mr-auto text-xs font-medium text-red-600">
+              {getApiErrorMessage(
+                approvalMutation.error,
+                "Failed to process leave request"
+              )}
+            </p>
+          )}
           {action === "reject" ? (
             <>
               <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+                onClick={closeApproveModal}
+                disabled={approvalMutation.isPending}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReject}
-                disabled={!remarks.trim()}
+                disabled={!remarks.trim() || approvalMutation.isPending}
                 className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm Rejection
+                {approvalMutation.isPending ? "Rejecting..." : "Confirm Rejection"}
               </button>
             </>
           ) : (
             <>
               <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+                onClick={closeApproveModal}
+                disabled={approvalMutation.isPending}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleApprove}
-                className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl transition-all"
+                disabled={approvalMutation.isPending}
+                className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Approve
+                {approvalMutation.isPending ? "Approving..." : "Approve"}
               </button>
             </>
           )}

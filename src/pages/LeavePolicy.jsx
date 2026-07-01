@@ -5,20 +5,18 @@
 //  UI matches Department / Designation / LeaveType pages
 // ─────────────────────────────────────────────
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
-import LeavePolicyForm, {
-  deriveYearDates,
-} from "../components/leavepolicy/LeavePolicyForm";
+import LeavePolicyForm from "../components/leavepolicy/LeavePolicyForm";
 import DeleteConfirm from "../components/leavepolicy/DeleteConfirm";
 import {
-  createLeavePolicy,
-  updateLeavePolicy,
-  deleteLeavePolicy,
-  fetchLeavePolicies,
-  fetchLeaveTypes,
-  fetchEmployeeTypes,
-} from "../api/leavePolicyApi";
+  useCreateLeavePolicy,
+  useDeleteLeavePolicy,
+  useLeavePolicy,
+  useLeavePolicyReferences,
+  useUpdateLeavePolicy,
+} from "../hooks/query/useLeavePolicy";
+import { leavePolicySchema } from "../schemas/leavePolicySchema";
 import { getRoleFromToken, getUserIdFromToken } from "../utils/auth.js";
 
 const PAGE_SIZE = 8;
@@ -184,9 +182,6 @@ export default function LeavePolicy() {
   const role = getRoleFromToken();
 
   // ── Data state ────────────────────────────────
-  const [policies, setPolicies] = useState([]);
-  const [leaveTypes, setLeaveTypes] = useState([]);
-  const [employeeTypes, setEmployeeTypes] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -198,98 +193,40 @@ export default function LeavePolicy() {
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   // ── API state ─────────────────────────────────
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState("");
 
-  // ── Load all data on mount ────────────────────
-  useEffect(() => {
-    if (role === "admin") {
-      loadAll();
-    }
-  }, []);
+  const policiesQuery = useLeavePolicy({ enabled: role === "admin" });
+  const referencesQuery = useLeavePolicyReferences({ enabled: role === "admin" });
+  const createLeavePolicyMutation = useCreateLeavePolicy();
+  const updateLeavePolicyMutation = useUpdateLeavePolicy();
+  const deleteLeavePolicyMutation = useDeleteLeavePolicy();
 
-  const loadAll = async () => {
-    setLoading(true);
-    setApiError("");
-
-    try {
-      const [policiesResult, leaveTypesResult, employeeTypesResult] =
-        await Promise.allSettled([
-          fetchLeavePolicies(),
-          fetchLeaveTypes(),
-          fetchEmployeeTypes(),
-        ]);
-
-      if (leaveTypesResult.status === "fulfilled") {
-        console.log("✅ Leave types:", leaveTypesResult.value);
-        setLeaveTypes(
-          toArray(leaveTypesResult.value)
-            .map(mapLeaveTypeOption)
-            .filter((item) => item.id),
-        );
-      } else {
-        console.error(
-          "❌ Failed to load leave types:",
-          leaveTypesResult.reason,
-        );
-      }
-
-      if (employeeTypesResult.status === "fulfilled") {
-        console.log("✅ Employee types:", employeeTypesResult.value);
-        setEmployeeTypes(
-          toArray(employeeTypesResult.value)
-            .map(mapEmployeeTypeOption)
-            .filter((item) => item.id),
-        );
-      } else {
-        console.error(
-          "❌ Failed to load employee types:",
-          employeeTypesResult.reason,
-        );
-      }
-
-      if (policiesResult.status === "fulfilled") {
-        console.log("✅ Policies:", policiesResult.value);
-        setPolicies(toArray(policiesResult.value).map(mapPolicyItem));
-      } else {
-        console.error("❌ Failed to load policies:", policiesResult.reason);
-        setPolicies([]);
-      }
-
-      if (
-        leaveTypesResult.status === "rejected" &&
-        employeeTypesResult.status === "rejected"
-      ) {
-        const error = employeeTypesResult.reason || leaveTypesResult.reason;
-        setApiError(
-          error?.response?.data?.message ||
-            error?.response?.data?.error ||
-            "Failed to load form dropdown data.",
-        );
-      } else if (policiesResult.status === "rejected") {
-        setApiError(
-          policiesResult.reason?.response?.data?.message ||
-            policiesResult.reason?.response?.data?.error ||
-            "Leave policies could not be loaded, but you can still add a policy.",
-        );
-      }
-    } catch (error) {
-      console.error("❌ Unexpected load error:", error);
-      setApiError("Failed to load leave policy data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadPolicies = async () => {
-    try {
-      const data = await fetchLeavePolicies();
-      setPolicies(toArray(data).map(mapPolicyItem));
-    } catch (error) {
-      console.error("❌ Failed to refresh policies:", error);
-    }
-  };
+  const policies = useMemo(
+    () => toArray(policiesQuery.data).map(mapPolicyItem),
+    [policiesQuery.data],
+  );
+  const leaveTypes = useMemo(
+    () => toArray(referencesQuery.data?.leaveTypes)
+      .map(mapLeaveTypeOption)
+      .filter((item) => item.id),
+    [referencesQuery.data],
+  );
+  const employeeTypes = useMemo(
+    () => toArray(referencesQuery.data?.employeeTypes)
+      .map(mapEmployeeTypeOption)
+      .filter((item) => item.id),
+    [referencesQuery.data],
+  );
+  const loading = policiesQuery.isLoading || referencesQuery.isLoading;
+  const submitting =
+    createLeavePolicyMutation.isPending ||
+    updateLeavePolicyMutation.isPending ||
+    deleteLeavePolicyMutation.isPending;
+  const pageError = apiError || (policiesQuery.isError
+    ? "Failed to load leave policies. Please try again."
+    : referencesQuery.isError
+      ? "Failed to load leave policy reference data."
+      : "");
 
   // ── Helper: resolve labels from IDs ──────────
   const resolveLabel = (id, list) =>
@@ -355,28 +292,22 @@ export default function LeavePolicy() {
   };
 
   const handleFormSubmit = async (formData) => {
-    setSubmitting(true);
     setApiError("");
+    const parsed = leavePolicySchema.safeParse(formData);
+
+    if (!parsed.success) {
+      setApiError(parsed.error.issues[0]?.message || "Invalid leave policy details.");
+      return;
+    }
 
     try {
-      const typeId = formData?.type_id || "";
-      const employeeTypeId = formData?.employee_type_id || "";
-      const noOfDays = Number(formData?.no_of_days);
+      const typeId = parsed.data.type_id;
+      const employeeTypeId = parsed.data.employee_type_id;
+      const noOfDays = Number(parsed.data.no_of_days);
       const { startDate, endDate } = getFinancialYearDates(
-        formData?.financial_year,
+        parsed.data.financial_year,
       );
       const createdBy = getCreatedBy();
-
-      if (
-        !typeId ||
-        !employeeTypeId ||
-        !formData?.financial_year ||
-        !Number.isFinite(noOfDays) ||
-        noOfDays <= 0
-      ) {
-        setApiError("All fields are required.");
-        return;
-      }
 
       if (!startDate || !endDate) {
         setApiError("Invalid financial year selected.");
@@ -399,18 +330,17 @@ export default function LeavePolicy() {
       };
 
       if (formMode === "add") {
-        await createLeavePolicy(body);
-        console.log("✅ Policy created");
-        await loadPolicies();
+        await createLeavePolicyMutation.mutateAsync(body);
       } else {
         if (!editTarget?.id) {
           setApiError("Unable to identify the policy to update.");
           return;
         }
 
-        await updateLeavePolicy(editTarget.id, body);
-        console.log("✅ Policy updated");
-        await loadPolicies();
+        await updateLeavePolicyMutation.mutateAsync({
+          id: editTarget.id,
+          data: body,
+        });
       }
 
       setShowForm(false);
@@ -422,8 +352,6 @@ export default function LeavePolicy() {
         error.response?.data?.error ||
         "Something went wrong. Please try again.";
       setApiError(message);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -436,8 +364,7 @@ export default function LeavePolicy() {
 
     try {
       setApiError("");
-      await deleteLeavePolicy(deleteTarget.id);
-      await loadPolicies();
+      await deleteLeavePolicyMutation.mutateAsync(deleteTarget.id);
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (error) {
@@ -455,8 +382,9 @@ export default function LeavePolicy() {
 
     try {
       setApiError("");
-      await Promise.all(selectedIds.map((id) => deleteLeavePolicy(id)));
-      await loadPolicies();
+      await Promise.all(
+        selectedIds.map((id) => deleteLeavePolicyMutation.mutateAsync(id)),
+      );
       setSelectedIds([]);
     } catch (error) {
       console.error("❌ Bulk delete API Error:", error);
@@ -555,6 +483,12 @@ export default function LeavePolicy() {
           Add Policy
         </button>
       </div>
+
+      {pageError && !showForm && !deleteTarget && (
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {pageError}
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">

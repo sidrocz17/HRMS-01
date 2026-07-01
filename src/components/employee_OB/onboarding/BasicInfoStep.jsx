@@ -1,4 +1,18 @@
 // src/components/employee/onboarding/BasicInfoStep.jsx
+const ErrorMsg = ({ errors, field }) =>
+  errors[field] ? (
+    <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+          clipRule="evenodd"
+        />
+      </svg>
+      {errors[field]}
+    </p>
+  ) : null;
+
 export default function BasicInfoStep({ data, errors, onChange }) {
   const inputClass = (fieldName) =>
     `w-full px-4 py-2.5 text-sm border rounded-xl outline-none transition-all
@@ -7,20 +21,6 @@ export default function BasicInfoStep({ data, errors, onChange }) {
       ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-2 focus:ring-red-100"
       : "border-gray-200 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
     }`;
-
-  const ErrorMsg = ({ field }) =>
-    errors[field] ? (
-      <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-        {errors[field]}
-      </p>
-    ) : null;
 
   return (
     <div className="space-y-6">
@@ -41,7 +41,7 @@ export default function BasicInfoStep({ data, errors, onChange }) {
               onChange={(e) => onChange("basicInfo", "first_name", e.target.value)}
               className={inputClass("first_name")}
             />
-            <ErrorMsg field="first_name" />
+            <ErrorMsg errors={errors} field="first_name" />
           </div>
 
           <div>
@@ -55,7 +55,7 @@ export default function BasicInfoStep({ data, errors, onChange }) {
               onChange={(e) => onChange("basicInfo", "last_name", e.target.value)}
               className={inputClass("last_name")}
             />
-            <ErrorMsg field="last_name" />
+            <ErrorMsg errors={errors} field="last_name" />
           </div>
 
           <div>
@@ -69,7 +69,7 @@ export default function BasicInfoStep({ data, errors, onChange }) {
               onChange={(e) => onChange("basicInfo", "email", e.target.value)}
               className={inputClass("email")}
             />
-            <ErrorMsg field="email" />
+            <ErrorMsg errors={errors} field="email" />
           </div>
 
           <div>
@@ -83,7 +83,7 @@ export default function BasicInfoStep({ data, errors, onChange }) {
               onChange={(e) => onChange("basicInfo", "phone", e.target.value)}
               className={inputClass("phone")}
             />
-            <ErrorMsg field="phone" />
+            <ErrorMsg errors={errors} field="phone" />
           </div>
 
           <div>
@@ -98,7 +98,7 @@ export default function BasicInfoStep({ data, errors, onChange }) {
               }
               className={inputClass("date_of_birth")}
             />
-            <ErrorMsg field="date_of_birth" />
+            <ErrorMsg errors={errors} field="date_of_birth" />
           </div>
         </div>
 
@@ -118,7 +118,7 @@ export default function BasicInfoStep({ data, errors, onChange }) {
                 : "border-gray-200 focus:border-[#1a2240] focus:ring-2 focus:ring-[#1a2240]/10"
               }`}
           />
-          <ErrorMsg field="address" />
+          <ErrorMsg errors={errors} field="address" />
         </div>
       </div>
     </div>

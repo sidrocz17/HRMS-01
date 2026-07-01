@@ -1,4 +1,6 @@
 // src/components/employee/EmployeeTable.jsx
+import { parseApiDate } from "../../utils/date";
+
 export default function EmployeeTable({
   employees,
   onEdit,
@@ -7,7 +9,14 @@ export default function EmployeeTable({
 }) {
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-IN", {
+
+    const parsedDate = parseApiDate(dateStr);
+
+    if (!parsedDate) {
+      return "-";
+    }
+
+    return parsedDate.toLocaleDateString("en-IN", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -46,16 +55,17 @@ export default function EmployeeTable({
           <tbody className="divide-y divide-gray-100">
             {employees.map((employee) => (
               <tr
-                key={employee.emp_id}
+                key={employee.emp_id || employee.empId || employee.email}
                 className="hover:bg-gray-50 transition-colors"
               >
                 {/* Employee Name */}
                 <td className="px-6 py-4 text-sm font-medium text-gray-900">
                   <div>
                     <p className="font-medium text-gray-900">
-                      {employee.first_name} {employee.last_name}
+                      {employee.first_name || employee.firstName || "-"}{" "}
+                      {employee.last_name || employee.lastName || ""}
                     </p>
-                    <p className="text-xs text-gray-500">{employee.email}</p>
+                    <p className="text-xs text-gray-500">{employee.email || "-"}</p>
                   </div>
                 </td>
 

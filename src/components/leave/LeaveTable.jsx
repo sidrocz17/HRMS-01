@@ -3,6 +3,11 @@
 //  My Leaves — table showing user's leave requests
 // ─────────────────────────────────────────────
 
+import useLeaveStore from "../../store/useLeaveStore";
+import { useLeaves } from "../../hooks/queries/useLeaves";
+import { getApiErrorMessage } from "../../utils/leaveTransformers";
+import { getUserFromToken } from "../../utils/auth";
+
 const StatusBadge = ({ status }) => {
   const normalizedStatus = (() => {
     const value = String(status || "").trim().toLowerCase();
@@ -45,7 +50,16 @@ const Tooltip = ({ text, children }) => (
   </div>
 );
 
-export default function LeaveTable({ data, onCancel }) {
+export default function LeaveTable() {
+  const { empId } = getUserFromToken();
+  const {
+    data = [],
+    isLoading,
+    isError,
+    error,
+  } = useLeaves(empId);
+  const openCancelModal = useLeaveStore((state) => state.openCancelModal);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
@@ -65,7 +79,19 @@ export default function LeaveTable({ data, onCancel }) {
           </thead>
 
           <tbody className="divide-y divide-gray-50">
-            {data.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-400">
+                  Loading leaves...
+                </td>
+              </tr>
+            ) : isError ? (
+              <tr>
+                <td colSpan={7} className="px-6 py-12 text-center text-sm text-red-600">
+                  {getApiErrorMessage(error, "Failed to load leave history")}
+                </td>
+              </tr>
+            ) : data.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-16 text-center">
                   <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -139,7 +165,7 @@ export default function LeaveTable({ data, onCancel }) {
                       {String(leave.status || "").trim().toLowerCase() === "pending" && (
                         <Tooltip text="Cancel">
                           <button
-                            onClick={() => onCancel(leave.id)}
+                            onClick={() => openCancelModal(leave)}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all duration-150"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
