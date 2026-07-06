@@ -130,11 +130,11 @@ export const MENU_CONFIG = {
       icon: Icons.payroll,
       children: [],
     },
-    {
-      label: "Reports",
-      icon: Icons.reports,
-      children: ["Employee Leave Report", "Employee Attendance Report"],
-    },
+    // {
+    //   label: "Reports",
+    //   icon: Icons.reports,
+    //   children: ["Employee Leave Report", "Employee Attendance Report"],
+    // },
   ],
 
   // ── HR: people ops access ───────────────────
@@ -159,11 +159,11 @@ export const MENU_CONFIG = {
       icon: Icons.attendance,
       children: ["Attendance Dashboard", "Holiday List"],
     },
-    {
-      label: "Reports",
-      icon: Icons.reports,
-      children: ["Employee Leave Report", "Employee Attendance Report"],
-    },
+    // {
+    //   label: "Reports",
+    //   icon: Icons.reports,
+    //   children: ["Employee Leave Report", "Employee Attendance Report"],
+    // },
   ],
 
   // ── EMPLOYEE: self-service only ─────────────

@@ -56,9 +56,9 @@ const ROUTE_MAP = {
   "Holiday Calendar": "/holidays",
   "My Profile": "/my-profile",
 
-  // Reports
-  "Employee Leave Report": "/reports/employee",
-  "Employee Attendance Report": "/reports/attendance",
+  // Reports feature disabled for now.
+  // "Employee Leave Report": "/reports/employee",
+  // "Employee Attendance Report": "/reports/attendance",
 };
 
 // ─────────────────────────────────────────────

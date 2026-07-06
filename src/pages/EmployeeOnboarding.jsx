@@ -184,29 +184,9 @@ const toInputDate = (value) => {
   return asString.length >= 10 ? asString.slice(0, 10) : asString;
 };
 
-const firstFilledValue = (...values) =>
-  values.find(
-    (value) => value !== undefined && value !== null && value !== "",
-  ) ?? "";
-
 const asObject = (value) =>
   value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
-const getResponseSources = (response) => {
-  const root = asObject(response);
-  const data = asObject(root.data);
-
-  return [
-    root,
-    data,
-    asObject(root.result),
-    asObject(root.payload),
-    asObject(root.employee),
-    asObject(data.result),
-    asObject(data.payload),
-    asObject(data.employee),
-  ];
-};
 
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(

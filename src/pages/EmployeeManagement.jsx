@@ -9,10 +9,12 @@ import { useDeleteEmployee, useEmployees } from "../hooks/query/useEmployees";
 import useEmployeeStore from "../store/useEmployeeStore";
 import { getApiErrorMessage } from "../utils/leaveTransformers";
 
+const EMPTY_EMPLOYEES = [];
+
 export default function EmployeeManagement() {
   const navigate = useNavigate();
   const {
-    data: queriedEmployees = [],
+    data: queriedEmployees = EMPTY_EMPLOYEES,
     isLoading: employeeLoading,
     isError: isEmployeeError,
     error: employeeError,

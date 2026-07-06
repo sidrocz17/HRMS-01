@@ -1,4 +1,3 @@
-// src/pages/Offboarding.jsx
 // ─────────────────────────────────────────────
 //  Offboarding Management Page
 //  RBAC:

@@ -19,8 +19,8 @@ import EmployeeManagement from "./pages/EmployeeManagement";
 import Attendance from "./pages/Attendance";
 import Offboarding from "./pages/Offboarding";
 import MyProfile from "./pages/MyProfile";
-import LeaveReports from "./pages/LeaveReports";
-import AttendanceReports from "./pages/AttendanceReports";
+// import LeaveReports from "./pages/LeaveReports";
+// import AttendanceReports from "./pages/AttendanceReports";
 
 function DashboardLayout({ page }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -40,8 +40,8 @@ function DashboardLayout({ page }) {
     attendance: <Attendance />,
     offboarding: <Offboarding />,
     "my-profile": <MyProfile />,
-    "reports/leave": <LeaveReports />,
-    "reports/attendance": <AttendanceReports />,
+    // "reports/leave": <LeaveReports />,
+    // "reports/attendance": <AttendanceReports />,
     // employees: <Employee />,  ← uncomment when built
     // payroll:   <Payroll />,   ← uncomment when built
   };
@@ -190,6 +190,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* Reports feature disabled for now.
           <Route
             path="/reports/employee"
             element={
@@ -198,6 +199,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          */}
           <Route
             path="/reports/attendance"
             element={

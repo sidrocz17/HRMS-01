@@ -11,10 +11,7 @@ import ThoughtCard from "../components/attendancePage/ThoughtCard";
 import AttendanceCard from "../components/attendancePage/AttendanceCard";
 import AttendanceTable from "../components/attendancePage/AttendanceTable";
 import { useAttendance } from "../hooks/queries/useAttendance";
-import {
-  usePunchIn,
-  usePunchOut,
-} from "../hooks/mutations/useAttendancePunch";
+import { usePunchIn, usePunchOut } from "../hooks/mutations/useAttendancePunch";
 import { attendancePunchSchema } from "../schemas/attendanceSchema";
 import useAttendanceStore from "../store/useAttendanceStore";
 import { getApiErrorMessage } from "../utils/leaveTransformers";
@@ -37,7 +34,7 @@ const getLocalDateKey = (value = new Date()) => {
   }
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
+    date.getDate(),
   )}`;
 };
 
@@ -73,7 +70,7 @@ const deriveTodayState = (records = []) => {
   const latestInRecord = sortedRecords.find((record) => record.inISO);
   const latestOutRecord = sortedRecords.find((record) => record.outISO);
   const hasCheckedInToday = todayCandidates.some(
-    (record) => record.inISO || record.outISO
+    (record) => record.inISO || record.outISO,
   );
 
   return {
@@ -81,8 +78,8 @@ const deriveTodayState = (records = []) => {
       latestInRecord?.inISO && latestOutRecord?.outISO
         ? STATUS.COMPLETED
         : hasCheckedInToday
-        ? STATUS.WORKING
-        : STATUS.NOT_STARTED,
+          ? STATUS.WORKING
+          : STATUS.NOT_STARTED,
     hasCheckedInToday,
     todayRecord: hasCheckedInToday
       ? {
@@ -173,18 +170,23 @@ export default function Attendance() {
 
   const todayState = useMemo(
     () => deriveTodayState(attendanceRecords),
-    [attendanceRecords]
+    [attendanceRecords],
   );
 
   const filteredRecords = useMemo(() => {
-    const search = String(filters.search || "").trim().toLowerCase();
-    const statusFilter = String(filters.status || "").trim().toUpperCase();
+    const search = String(filters.search || "")
+      .trim()
+      .toLowerCase();
+    const statusFilter = String(filters.status || "")
+      .trim()
+      .toUpperCase();
 
     return attendanceRecords.filter((record) => {
       const matchesDate =
         !isAdminOrHR || !selectedDate || record.dateISO === selectedDate;
       const matchesStatus =
-        !statusFilter || String(record.status || "").toUpperCase() === statusFilter;
+        !statusFilter ||
+        String(record.status || "").toUpperCase() === statusFilter;
       const matchesSearch =
         !search ||
         [record.employeeName, record.employeeId, record.remarks]
@@ -193,7 +195,13 @@ export default function Attendance() {
 
       return matchesDate && matchesStatus && matchesSearch;
     });
-  }, [attendanceRecords, filters.search, filters.status, isAdminOrHR, selectedDate]);
+  }, [
+    attendanceRecords,
+    filters.search,
+    filters.status,
+    isAdminOrHR,
+    selectedDate,
+  ]);
 
   // ── Helpers ───────────────────────────────────
   const showToast = (message, type = "success") => setToast({ message, type });
@@ -218,10 +226,9 @@ export default function Attendance() {
   });
 
   const submitting = punchInMutation.isPending || punchOutMutation.isPending;
-  const pageError =
-    !hasEmployeeId
-      ? "Employee ID missing. Please log out and log in again."
-      : isError
+  const pageError = !hasEmployeeId
+    ? "Employee ID missing. Please log out and log in again."
+    : isError
       ? getApiErrorMessage(error, "Failed to load attendance.")
       : "";
 
